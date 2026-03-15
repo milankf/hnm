@@ -1,0 +1,50 @@
+---
+description: Component replacement and versioning workflow - never delete replaced components; create new ones and track versions for easy rollback
+alwaysApply: true
+---
+
+# Component Versioning and Replacement
+
+When the user requests a **REPLACEMENT** of a component or feature, follow this workflow.
+
+## Replacement (Major Version)
+
+- **Never delete** the old component. Keep it in the codebase.
+- **Create a new component** (e.g., `PhotoCarouselV2.tsx`, `InviteMessageAlt.tsx`, or use a version suffix).
+- **Plug in** the new component where the old one was used (update the import and usage).
+- **Bump major version** in [VERSIONS.md](VERSIONS.md) and document:
+  - What was replaced
+  - Path to the OLD component (kept for rollback)
+  - Path to the NEW component (now active)
+  - Why / user request summary
+
+**Example:** Replacing photo carousel with scroll gallery → create `PhotoGallery.tsx`, keep `PhotoCarousel.tsx`, switch import in parent. Log in VERSIONS.md.
+
+## Significant In-Component Changes (Minor Version)
+
+- **Big layout or style changes** within the same component (e.g., switching from grid to flex, changing breakpoints) = minor version.
+- **Keep the same file** but bump minor version in VERSIONS.md.
+- Document: component path, what changed, brief reason.
+
+## VERSIONS.md Structure
+
+Maintain [VERSIONS.md](VERSIONS.md) at project root with semantic versions (MAJOR.MINOR):
+
+```markdown
+## v1.1.0 (minor)
+- **HeroSection**: Layout changed from 50/50 to 45/55 split on desktop.
+
+## v2.0.0 (major)
+- **Photo display**: Replaced PhotoCarousel with PhotoGallery.
+  - Old: `components/sections/PhotoCarousel.tsx`
+  - New: `components/sections/PhotoGallery.tsx`
+```
+
+## Rollback
+
+When the user wants to go back to a version:
+
+- For **major** rollbacks: swap imports back to the old component path.
+- For **minor** rollbacks: revert the component file to the state described for that version (or use git if committed).
+
+Always confirm the target version with the user before reverting.

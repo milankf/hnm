@@ -4,7 +4,7 @@ import type { MotionValue } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Checkbox } from "../components/ui/checkbox";
 import { useMotionValue, useMotionValueEvent, useScroll, useSpring, useTransform, motion } from "motion/react";
 
 const REDEMPTORIST_MAP =
@@ -84,6 +84,7 @@ export default function Home() {
   const eventDetailsRef = useRef<HTMLElement>(null);
   const programRef = useRef<HTMLElement>(null);
   const photosCarouselRef = useRef<HTMLElement>(null);
+  const rsvpRef = useRef<HTMLElement>(null);
 
   // ——— Title section: typewriter ———
   const [visibleLength, setVisibleLength] = useState(0);
@@ -158,6 +159,10 @@ export default function Home() {
   });
   const carouselX = useTransform(smoothCarouselProgress, [0, 1], [0, -2900]);
   const carouselXBack = useTransform(smoothCarouselProgress, [0, 1], [0, 2500]);
+
+  const scrollToRsvp = () => {
+    rsvpRef.current?.scrollIntoView({ behavior: "instant" });
+  };
 
   return (
     <main className="min-h-screen w-full">
@@ -365,8 +370,22 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Floating RSVP button */}
+      <Button
+        variant="default"
+        size="lg"
+        className="fixed bottom-6 right-6 z-50 font-mono shadow-lg sm:bottom-8 sm:right-8"
+        onClick={scrollToRsvp}
+        type="button"
+      >
+        RSVP
+      </Button>
+
       {/* RSVP section */}
-      <section className="flex min-h-screen w-full flex-col items-center justify-center gap-10 px-6 py-16 sm:px-12">
+      <section
+        ref={rsvpRef}
+        className="flex min-h-screen w-full flex-col items-center justify-center gap-10 px-6 py-16 sm:px-12"
+      >
         <h2 className="text-center font-mono text-6xl font-medium text-foreground sm:text-8xl md:text-9xl">
           RSVP
         </h2>
@@ -376,7 +395,7 @@ export default function Home() {
               <Checkbox
                 id={name}
                 checked={rsvpChecked[name] ?? false}
-                onCheckedChange={(checked) =>
+                onCheckedChange={(checked: boolean) =>
                   setRsvpChecked((prev) => ({ ...prev, [name]: checked }))
                 }
               />
