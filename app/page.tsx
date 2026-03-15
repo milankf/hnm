@@ -4,7 +4,7 @@ import type { MotionValue } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "../components/ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMotionValue, useMotionValueEvent, useScroll, useSpring, useTransform, motion } from "motion/react";
 
 const REDEMPTORIST_MAP =
