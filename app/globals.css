@@ -113,6 +113,32 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* Cinematic film effects — respect prefers-reduced-motion in components */
+@keyframes cinematic-flicker {
+  0%, 100% { opacity: 0; }
+  10%, 30%, 50%, 70%, 90% { opacity: 0; }
+  5%, 15%, 25% { opacity: 0.03; }
+  20%, 40% { opacity: 0.02; }
+}
+@keyframes cinematic-gate-weave {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(1px); }
+  50% { transform: translateX(-1px); }
+  75% { transform: translateX(0.5px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cinematic-flicker,
+  .cinematic-gate-weave {
+    animation: none !important;
+  }
+}
+.cinematic-flicker {
+  animation: cinematic-flicker 0.15s steps(2) infinite;
+}
+.cinematic-gate-weave {
+  animation: cinematic-gate-weave 4s ease-in-out infinite;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
