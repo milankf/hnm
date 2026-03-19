@@ -9,6 +9,7 @@ import {
 import { relations } from "drizzle-orm";
 
 export const inviteeTypeEnum = pgEnum("invitee_type", ["family", "individual"]);
+export const individualSideEnum = pgEnum("individual_side", ["bride", "groom"]);
 
 // Invitee = either a family or an individual
 // URL: hisolermilan.com/[slug]
@@ -16,6 +17,7 @@ export const invitees = pgTable("invitees", {
   id: uuid("id").primaryKey().defaultRandom(),
   slug: text("slug").notNull().unique(),
   type: inviteeTypeEnum("type").notNull(),
+  individualSide: individualSideEnum("individual_side"),
   displayName: text("display_name").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

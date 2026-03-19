@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { XIcon } from "lucide-react";
 import {
   CinematicVideoStrip,
   type CinematicSceneRenderState,
@@ -11,6 +12,7 @@ import {
 } from "@/components/cinematic-video-strip";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Guest, Invitee } from "@/db/schema";
 
@@ -33,19 +35,23 @@ const PROGRAM_ITEMS = [
 ];
 
 const SECTION_TWO_CAROUSEL_PHOTOS = [
-  { src: "/carousel_1.webp", caption: "Where it all began." },
-  { src: "/beverly.jpg" },
-  { src: "/sec1_1.webp", caption: "A quiet in-between moment." },
-  { src: "/obri_car.webp" },
-  { src: "/redemptorist.jpg", caption: "A place close to our hearts." },
-  { src: "/beverly.jpg" },
-  { src: "/sec1_1.webp" },
-  { src: "/obri_car.webp", caption: "On our way to forever." },
-  { src: "/redemptorist.jpg" },
-  { src: "/beverly.jpg", caption: "Celebrating with everyone we love." },
-  { src: "/sec1_1.webp" },
-  { src: "/obri_car.webp" },
+  { src: "/carousel_1.webp", caption: "where it all began" },
+  { src: "/carousel_busay.webp" },
+  { src: "/carousel_peppa.webp" },
+  { src: "/carousel_sg.jpeg", caption: "travels..." },
+  { src: "/carousel_thai.jpeg" },
+  { src: "/carousel_bar.webp" },
+  { src: "/carousel_cablecar.webp" },
+  { src: "/carousel_penny.jpg", caption: "milestones" },
+  { src: "/carousel_melvin.JPG" },
+  { src: "/carousel_tavolata.webp", caption: "dates" },
+  { src: "/carousel_palawan.webp" },
+  { src: "/carousel_tagaytay.webp" },
+  { src: "/carousel_oceanpark.webp" },
+  { src: "/carousel_motor.webp" },
 ];
+
+const STORY_CAROUSEL_HOLD_VH = Math.max(100, SECTION_TWO_CAROUSEL_PHOTOS.length * 14);
 
 function pad2(value: number) {
   return String(value).padStart(2, "0");
@@ -113,6 +119,9 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [maxShiftPx, setMaxShiftPx] = useState(0);
+  const [smoothShiftPx, setSmoothShiftPx] = useState(0);
+  const smoothShiftPxRef = useRef(0);
+  const shiftAnimationRef = useRef<number | null>(null);
 
   useEffect(() => {
     const measure = () => {
@@ -139,7 +148,52 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
     };
   }, []);
 
-  const shiftPx = maxShiftPx * holdProgress;
+  const carouselProgress = Math.min(holdProgress / 0.88, 1);
+  const targetShiftPx = maxShiftPx * carouselProgress;
+
+  useEffect(() => {
+    if (holdProgress >= 0.94) {
+      if (shiftAnimationRef.current) {
+        cancelAnimationFrame(shiftAnimationRef.current);
+      }
+      shiftAnimationRef.current = requestAnimationFrame(() => {
+        smoothShiftPxRef.current = targetShiftPx;
+        setSmoothShiftPx(targetShiftPx);
+        shiftAnimationRef.current = null;
+      });
+      return;
+    }
+
+    if (shiftAnimationRef.current) {
+      cancelAnimationFrame(shiftAnimationRef.current);
+      shiftAnimationRef.current = null;
+    }
+
+    const animate = () => {
+      const current = smoothShiftPxRef.current;
+      const next = current + (targetShiftPx - current) * 0.18;
+
+      if (Math.abs(targetShiftPx - next) <= 0.2) {
+        smoothShiftPxRef.current = targetShiftPx;
+        setSmoothShiftPx(targetShiftPx);
+        shiftAnimationRef.current = null;
+        return;
+      }
+
+      smoothShiftPxRef.current = next;
+      setSmoothShiftPx(next);
+      shiftAnimationRef.current = requestAnimationFrame(animate);
+    };
+
+    shiftAnimationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (shiftAnimationRef.current) {
+        cancelAnimationFrame(shiftAnimationRef.current);
+        shiftAnimationRef.current = null;
+      }
+    };
+  }, [holdProgress, targetShiftPx]);
 
   return (
     <div className="flex h-full items-center justify-center p-4 sm:p-6">
@@ -158,28 +212,27 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
           className="w-full overflow-hidden py-1 sm:py-2"
           style={{
             maskImage:
-              "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)",
+              "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
             WebkitMaskImage:
-              "linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%)",
+              "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
           }}
         >
         <div
           ref={trackRef}
-          className="flex items-start gap-2 sm:gap-3"
+          className="flex items-start gap-2 pr-[12vw] sm:gap-3 sm:pr-[9vw] lg:pr-[7vw]"
           style={{
-            transform: `translateX(-${shiftPx}px)`,
+            transform: `translateX(-${smoothShiftPx}px)`,
             willChange: "transform",
           }}
         >
-          <div className="h-px w-2 shrink-0 sm:w-3" aria-hidden />
           {SECTION_TWO_CAROUSEL_PHOTOS.map((photo, index) => (
-            <div key={`${photo.src}-${index}`} className="w-[68vw] shrink-0 sm:w-[40vw] lg:w-[30vw]">
+            <div key={`${photo.src}-${index}`} className="w-[60vw] shrink-0 sm:w-[34vw] lg:w-[26vw]">
               <Image
                 src={photo.src}
                 alt={`Wedding memory ${index + 1}`}
                 width={720}
                 height={480}
-                className="h-44 w-full rounded-md object-cover sm:h-56"
+                className="aspect-square w-full rounded-md object-cover"
               />
               {photo.caption && (
                 <p
@@ -194,7 +247,6 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
               )}
             </div>
           ))}
-          <div className="h-px w-2 shrink-0 sm:w-3" aria-hidden />
         </div>
       </div>
       </div>
@@ -202,7 +254,7 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
   );
 }
 
-function SceneTwoCountdown() {
+function SceneTwoCountdown({ holdProgress }: { holdProgress: number }) {
   const [countdown, setCountdown] = useState<CountdownParts>(() => getCountdownParts(WEDDING_DATE_TARGET));
 
   useEffect(() => {
@@ -218,6 +270,19 @@ function SceneTwoCountdown() {
     { label: "minutes", value: countdown.minutes },
     { label: "seconds", value: countdown.seconds },
   ];
+  const dateText = "AUGUST 20, 2026 (THU)";
+  const timeText = "3:00 PM";
+  const unitDuration = 0.16;
+  const unitGap = 0.04;
+  const sequenceStart = 0.06;
+  const dateTypeStart = sequenceStart;
+  const dateTypeDuration = 0.24;
+  const dateTypeProgress = Math.max(0, Math.min(1, (holdProgress - dateTypeStart) / dateTypeDuration));
+  const dateVisibleLength = Math.min(dateText.length, Math.floor(dateTypeProgress * (dateText.length + 1)));
+  const timeTypeStart = sequenceStart;
+  const timeTypeDuration = 0.2;
+  const timeTypeProgress = Math.max(0, Math.min(1, (holdProgress - timeTypeStart) / timeTypeDuration));
+  const timeVisibleLength = Math.min(timeText.length, Math.floor(timeTypeProgress * (timeText.length + 1)));
 
   return (
     <div className="flex h-full items-center justify-center p-6 text-center">
@@ -229,25 +294,39 @@ function SceneTwoCountdown() {
         }}
       >
         <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
-          {units.map((unit) => (
-            <div
-              key={unit.label}
-              className="min-w-0 rounded-md border border-white/30 bg-black/25 px-1.5 py-2.5 sm:px-3 sm:py-4"
-            >
-              <p className="truncate font-mono text-[clamp(1.15rem,6.2vw,1.9rem)] font-bold leading-none tabular-nums sm:text-5xl">
-                {unit.value}
-              </p>
-              <p className="mt-2 text-[9px] font-semibold tracking-[0.12em] text-white/85 sm:text-xs sm:tracking-[0.16em]">
-                {unit.label}
-              </p>
-            </div>
-          ))}
+          {units.map((unit, index) => {
+            const unitStart = sequenceStart + index * (unitDuration + unitGap);
+            const unitEnd = unitStart + unitDuration;
+            const revealProgress = Math.max(0, Math.min(1, (holdProgress - unitStart) / (unitEnd - unitStart)));
+            const flipAngle = (1 - revealProgress) * 86;
+
+            return (
+              <div
+                key={unit.label}
+                className="min-w-0 rounded-md border border-white/30 bg-black/25 px-1.5 py-2.5 sm:px-3 sm:py-4"
+                style={{
+                  transform: `perspective(900px) rotateY(${flipAngle}deg)`,
+                  transformOrigin: "50% 50%",
+                  opacity: revealProgress,
+                  transition:
+                    "transform 360ms cubic-bezier(0.2, 0.76, 0.24, 1), opacity 220ms cubic-bezier(0.2, 0.76, 0.24, 1)",
+                }}
+              >
+                <p className="truncate font-mono text-[clamp(1.15rem,6.2vw,1.9rem)] font-bold leading-none tabular-nums sm:text-5xl">
+                  {unit.value}
+                </p>
+                <p className="mt-2 text-[9px] font-semibold tracking-[0.12em] text-white/85 sm:text-xs sm:tracking-[0.16em]">
+                  {unit.label}
+                </p>
+              </div>
+            );
+          })}
         </div>
         <p className="mt-6 text-xl font-bold uppercase tracking-[0.2em] text-white sm:text-3xl">
-          August 20, 2026, thu
+          {dateText.slice(0, dateVisibleLength)}
         </p>
         <p className="mt-3 text-lg font-medium tracking-[0.18em] text-white/95 sm:text-2xl">
-          3:00 PM
+          {timeText.slice(0, timeVisibleLength)}
         </p>
       </div>
     </div>
@@ -396,32 +475,98 @@ function SceneFiveProgram({ holdProgress }: { holdProgress: number }) {
   );
 }
 
-function DressCodeColorDots() {
+function DressCodeColorDots({ includeWhite = true }: { includeWhite?: boolean }) {
   return (
     <div
       className="mt-3 flex items-center gap-3 sm:mt-4 sm:gap-4"
       aria-label="Avoid black, white, blue, and navy blue"
     >
       <span className="inline-block h-7 w-7 rounded-full border border-white/40 bg-black sm:h-9 sm:w-9" />
-      <span className="inline-block h-7 w-7 rounded-full border border-white/50 bg-white sm:h-9 sm:w-9" />
+      {includeWhite && (
+        <span className="inline-block h-7 w-7 rounded-full border border-white/50 bg-white sm:h-9 sm:w-9" />
+      )}
       <span className="inline-block h-7 w-7 rounded-full border border-white/40 bg-blue-500 sm:h-9 sm:w-9" />
       <span className="inline-block h-7 w-7 rounded-full border border-white/40 bg-[#1f2a44] sm:h-9 sm:w-9" />
     </div>
   );
 }
 
-function DressCodePanel({ label, imageSrc, imageAlt }: { label: string; imageSrc: string; imageAlt: string }) {
+function DressCodePanel({
+  label,
+  imageSrc,
+  imageAlt,
+  portraitImage = false,
+  includeWhiteColor = true,
+}: {
+  label: string;
+  imageSrc: string;
+  imageAlt: string;
+  portraitImage?: boolean;
+  includeWhiteColor?: boolean;
+}) {
   return (
     <div className="grid items-center gap-3 rounded-lg border border-white/30 bg-black/30 p-3 sm:grid-cols-[1fr_1.2fr] sm:gap-5 sm:p-4">
-      <div className="overflow-hidden rounded-md border border-white/20">
-        <Image src={imageSrc} alt={imageAlt} width={640} height={420} className="h-32 w-full object-cover sm:h-40" />
-      </div>
+      <Dialog>
+        <div className={portraitImage ? "mx-auto inline-flex flex-col items-center sm:mx-0" : ""}>
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex cursor-zoom-in overflow-hidden rounded-md transition-opacity hover:opacity-90"
+              aria-label={`Open ${label} dress code photo preview`}
+            >
+              <Image
+                src={imageSrc}
+                alt={imageAlt}
+                width={640}
+                height={420}
+                className={`block object-cover ${
+                  portraitImage
+                    ? "aspect-square w-[52vw] max-w-[275px] sm:w-[32vw] sm:max-w-[325px]"
+                    : "h-32 w-full sm:h-40"
+                }`}
+              />
+            </button>
+          </DialogTrigger>
+          {portraitImage && (
+            <p className="mt-1 text-center font-mono text-[10px] uppercase tracking-[0.12em] text-white/55 sm:text-xs">
+              Click photo to open
+            </p>
+          )}
+        </div>
+        <DialogContent
+          showCloseButton={false}
+          overlayClassName="bg-black/20 backdrop-blur-[1px]"
+          className="w-auto max-w-[calc(100vw-0.75rem)] border-none bg-transparent p-0 shadow-none sm:max-w-[calc(100%-2rem)]"
+        >
+          <DialogTitle className="sr-only">{label} dress code photo preview</DialogTitle>
+          <div className="flex flex-col items-end gap-2">
+            <DialogClose asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                className="font-mono !text-white hover:!text-black focus:!text-white"
+                style={{ textShadow: "none" }}
+              >
+                Close
+                <XIcon />
+              </Button>
+            </DialogClose>
+            <Image
+              src={imageSrc}
+              alt={imageAlt}
+              width={1600}
+              height={2200}
+              className="h-[calc(100vh-5.75rem)] w-auto max-w-full rounded-xl object-contain sm:h-[88vh] sm:max-w-[calc(100vw-3rem)]"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
       <div className="text-left">
         <p className="font-mono text-lg font-bold text-white sm:text-2xl">{label}</p>
-        <p className="mt-1 font-mono text-xs uppercase tracking-[0.14em] text-white/90 sm:text-sm">
-          Avoid wearing the following colors
+        <p className="mt-1 font-mono text-xs tracking-[0.08em] text-white/90 sm:text-sm">
+          Please avoid wearing the following colors.
         </p>
-        <DressCodeColorDots />
+        <DressCodeColorDots includeWhite={includeWhiteColor} />
       </div>
     </div>
   );
@@ -440,7 +585,12 @@ function SceneSixDressCodeLadies() {
         <p className="mb-3 text-center font-mono text-2xl font-extrabold tracking-[0.06em] sm:mb-5 sm:text-4xl">
           What to wear
         </p>
-        <DressCodePanel label="Ladies" imageSrc="/sec1_1.webp" imageAlt="Ladies dress code inspiration" />
+        <DressCodePanel
+          label="Ladies"
+          imageSrc="/ladies.jpeg"
+          imageAlt="Ladies dress code inspiration"
+          portraitImage={true}
+        />
       </div>
     </div>
   );
@@ -459,7 +609,13 @@ function SceneSevenDressCodeGents() {
         <p className="mb-3 text-center font-mono text-2xl font-extrabold tracking-[0.06em] sm:mb-5 sm:text-4xl">
           What to wear
         </p>
-        <DressCodePanel label="Gents" imageSrc="/obri_car.webp" imageAlt="Gents dress code inspiration" />
+        <DressCodePanel
+          label="Gents"
+          imageSrc="/gents.jpg"
+          imageAlt="Gents dress code inspiration"
+          portraitImage={true}
+          includeWhiteColor={false}
+        />
       </div>
     </div>
   );
@@ -780,7 +936,7 @@ const SCENES_BASE: CinematicStripScene[] = [
   {
     id: "story",
     videoSrc: "/walk_vid.mp4",
-    holdVh: 100,
+    holdVh: STORY_CAROUSEL_HOLD_VH,
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneTwoPhotoCarousel holdProgress={holdProgress} />
     ),
@@ -788,7 +944,8 @@ const SCENES_BASE: CinematicStripScene[] = [
   {
     id: "date",
     videoSrc: "/walk_vid.mp4",
-    content: <SceneTwoCountdown />,
+    holdVh: 100,
+    content: ({ holdProgress }: CinematicSceneRenderState) => <SceneTwoCountdown holdProgress={holdProgress} />,
   },
   {
     id: "church",
@@ -820,12 +977,12 @@ const SCENES_BASE: CinematicStripScene[] = [
   },
   {
     id: "gents",
-    videoSrc: "/intro_vid.mp4",
+    videoSrc: "/lights_vid.mp4",
     content: <SceneSevenDressCodeGents />,
   },
   {
     id: "wishlist",
-    videoSrc: "/dagat_vid.mp4",
+    videoSrc: "/photobooth_vid.mp4",
     contentClassName: "pointer-events-auto",
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneEightWishlist holdProgress={holdProgress} />
@@ -838,6 +995,36 @@ type WeddingPageProps = {
 };
 
 export function WeddingPage({ initialSlug }: WeddingPageProps) {
+  const backgroundAudioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    const audio = backgroundAudioRef.current;
+    if (!audio) return;
+
+    audio.volume = 0.1;
+    const playAudio = () => {
+      void audio.play().catch(() => {
+        // Autoplay can be blocked until first interaction.
+      });
+    };
+
+    playAudio();
+
+    const onFirstInteraction = () => {
+      playAudio();
+      window.removeEventListener("pointerdown", onFirstInteraction);
+      window.removeEventListener("keydown", onFirstInteraction);
+    };
+
+    window.addEventListener("pointerdown", onFirstInteraction);
+    window.addEventListener("keydown", onFirstInteraction);
+
+    return () => {
+      window.removeEventListener("pointerdown", onFirstInteraction);
+      window.removeEventListener("keydown", onFirstInteraction);
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash.replace("#", "");
@@ -876,16 +1063,19 @@ export function WeddingPage({ initialSlug }: WeddingPageProps) {
   );
 
   return (
-    <CinematicVideoStrip
-      scenes={scenes}
-      holdVh={25}
-      gapVh={4}
-      frameHeightVh={70}
-      enableScratches={true}
-      enableVignette={true}
-      enableScanlines={true}
-      enableFlicker={true}
-      enableGateWeave={true}
-    />
+    <>
+      {/* <audio ref={backgroundAudioRef} src="/inmylife.mp3" autoPlay loop preload="auto" className="hidden" /> */}
+      <CinematicVideoStrip
+        scenes={scenes}
+        holdVh={25}
+        gapVh={4}
+        frameHeightVh={70}
+        enableScratches={false}
+        enableVignette={true}
+        enableScanlines={true}
+        enableFlicker={true}
+        enableGateWeave={true}
+      />
+    </>
   );
 }

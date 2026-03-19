@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import {
@@ -20,16 +18,31 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Users, UserPlus, ExternalLink, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Users,
+  UserPlus,
+  Copy,
+  Check,
+  CircleCheck,
+  CircleX,
+  CircleMinus,
+  MoreVertical,
+} from "lucide-react";
 import type { Invitee, Guest } from "@/db/schema";
 
 type InviteeWithGuests = Invitee & { guests: Guest[] };
+type IndividualSide = "bride" | "groom";
 
 type AdminClientProps = {
   invitees: InviteeWithGuests[];
-  baseUrl: string;
   adminKey?: string;
 };
 
@@ -40,32 +53,17 @@ function slugify(s: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-function GuestStatusBadge({ guest }: { guest: Guest }) {
-  if (guest.attending === true) {
-    return (
-      <Badge variant="default" className="gap-1 bg-green-600 hover:bg-green-600/90">
-        <CheckCircle2 className="h-3 w-3" />
-        Coming
-      </Badge>
-    );
+function MemberStatusIcon({ attending }: { attending: boolean | null | undefined }) {
+  if (attending === true) {
+    return <CircleCheck className="h-3.5 w-3.5 shrink-0 text-green-600" />;
   }
-  if (guest.attending === false) {
-    return (
-      <Badge variant="secondary" className="gap-1">
-        <XCircle className="h-3 w-3" />
-        Declined
-      </Badge>
-    );
+  if (attending === false) {
+    return <CircleX className="h-3.5 w-3.5 shrink-0 text-red-600" />;
   }
-  return (
-    <Badge variant="outline" className="gap-1 text-muted-foreground">
-      <HelpCircle className="h-3 w-3" />
-      No response
-    </Badge>
-  );
+  return <CircleMinus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
 }
 
-export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
+export function AdminClient({ invitees, adminKey }: AdminClientProps) {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
     ...(adminKey && { Authorization: `Bearer ${adminKey}` }),
@@ -78,10 +76,28 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
   const [familyMembers, setFamilyMembers] = useState(["", ""]);
   const [indDisplayName, setIndDisplayName] = useState("");
   const [indSlug, setIndSlug] = useState("");
+  const [indSide, setIndSide] = useState<IndividualSide>("bride");
   const [familyStatus, setFamilyStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [familyStatusMessage, setFamilyStatusMessage] = useState("");
   const [indStatus, setIndStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [indStatusMessage, setIndStatusMessage] = useState("");
+  const [copiedInviteeId, setCopiedInviteeId] = useState<string | null>(null);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editInviteeId, setEditInviteeId] = useState<string | null>(null);
+  const [editType, setEditType] = useState<"family" | "individual">("family");
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editSlug, setEditSlug] = useState("");
+  const [editSide, setEditSide] = useState<IndividualSide>("bride");
+  const [editMembers, setEditMembers] = useState<string[]>([""]);
+  const [editStatus, setEditStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [editStatusMessage, setEditStatusMessage] = useState("");
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteInviteeId, setDeleteInviteeId] = useState<string | null>(null);
+  const [deleteInviteeName, setDeleteInviteeName] = useState("");
+  const [deleteStatus, setDeleteStatus] = useState<"idle" | "submitting" | "error">("idle");
+  const [deleteStatusMessage, setDeleteStatusMessage] = useState("");
 
   const resetFamilyForm = () => {
     setFamilyDisplayName("");
@@ -94,8 +110,27 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
   const resetIndividualForm = () => {
     setIndDisplayName("");
     setIndSlug("");
+    setIndSide("bride");
     setIndStatus("idle");
     setIndStatusMessage("");
+  };
+
+  const resetEditForm = () => {
+    setEditInviteeId(null);
+    setEditType("family");
+    setEditDisplayName("");
+    setEditSlug("");
+    setEditSide("bride");
+    setEditMembers([""]);
+    setEditStatus("idle");
+    setEditStatusMessage("");
+  };
+
+  const resetDeleteForm = () => {
+    setDeleteInviteeId(null);
+    setDeleteInviteeName("");
+    setDeleteStatus("idle");
+    setDeleteStatusMessage("");
   };
 
   const addFamilyMember = () => setFamilyMembers((prev) => [...prev, ""]);
@@ -107,6 +142,16 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
     });
   const removeFamilyMember = (i: number) =>
     setFamilyMembers((prev) => prev.filter((_, j) => j !== i));
+
+  const addEditMember = () => setEditMembers((prev) => [...prev, ""]);
+  const updateEditMember = (i: number, v: string) =>
+    setEditMembers((prev) => {
+      const next = [...prev];
+      next[i] = v;
+      return next;
+    });
+  const removeEditMember = (i: number) =>
+    setEditMembers((prev) => prev.filter((_, j) => j !== i));
 
   const submitFamily = async () => {
     const members = familyMembers.filter(Boolean);
@@ -152,6 +197,7 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
         headers,
         body: JSON.stringify({
           type: "individual",
+          individualSide: indSide,
           displayName: indDisplayName.trim(),
           slug: indSlug.trim(),
         }),
@@ -174,10 +220,123 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
     }
   };
 
+  const copyInviteeLink = async (slug: string, inviteeId: string) => {
+    const path = `/${slug}`;
+    const fullUrl =
+      typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
+    try {
+      await navigator.clipboard.writeText(fullUrl);
+      setCopiedInviteeId(inviteeId);
+      window.setTimeout(() => setCopiedInviteeId((current) => (current === inviteeId ? null : current)), 1200);
+    } catch {
+      // best effort fallback
+      setCopiedInviteeId(inviteeId);
+      window.setTimeout(() => setCopiedInviteeId((current) => (current === inviteeId ? null : current)), 1200);
+    }
+  };
+
+  const openEditModal = (inv: InviteeWithGuests) => {
+    setEditInviteeId(inv.id);
+    setEditType(inv.type);
+    setEditDisplayName(inv.displayName);
+    setEditSlug(inv.slug);
+    setEditSide((inv.individualSide as IndividualSide) ?? "bride");
+    const memberNames = inv.guests.map((g) => g.name);
+    setEditMembers(memberNames.length > 0 ? memberNames : [inv.displayName]);
+    setEditStatus("idle");
+    setEditStatusMessage("");
+    setEditOpen(true);
+  };
+
+  const submitEdit = async () => {
+    if (!editInviteeId) return;
+    const memberNames = editMembers.map((name) => name.trim()).filter(Boolean);
+    if (!editDisplayName.trim() || !editSlug.trim()) return;
+    if (editType === "family" && memberNames.length === 0) return;
+
+    setEditStatus("submitting");
+    setEditStatusMessage("");
+    try {
+      const res = await fetch("/api/admin/invitees", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          inviteeId: editInviteeId,
+          displayName: editDisplayName.trim(),
+          slug: editSlug.trim(),
+          individualSide: editType === "individual" ? editSide : undefined,
+          memberNames,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error ?? "Failed to update invitee");
+      }
+      const payload = data as { invitee: Invitee; guests: Guest[] };
+      setInviteesList((prev) =>
+        prev.map((inv) => (inv.id === payload.invitee.id ? { ...payload.invitee, guests: payload.guests } : inv))
+      );
+      setEditStatus("success");
+      setEditStatusMessage("Saved changes.");
+      window.setTimeout(() => {
+        setEditOpen(false);
+        resetEditForm();
+      }, 700);
+    } catch (e) {
+      setEditStatus("error");
+      setEditStatusMessage(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  };
+
+  const openDeleteModal = (inv: InviteeWithGuests) => {
+    setDeleteInviteeId(inv.id);
+    setDeleteInviteeName(inv.displayName);
+    setDeleteStatus("idle");
+    setDeleteStatusMessage("");
+    setDeleteOpen(true);
+  };
+
+  const submitDelete = async () => {
+    if (!deleteInviteeId) return;
+    setDeleteStatus("submitting");
+    setDeleteStatusMessage("");
+    try {
+      const res = await fetch("/api/admin/invitees", {
+        method: "DELETE",
+        headers,
+        body: JSON.stringify({ inviteeId: deleteInviteeId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error ?? "Failed to delete invitee");
+      }
+      setInviteesList((prev) => prev.filter((inv) => inv.id !== deleteInviteeId));
+      setDeleteOpen(false);
+      resetDeleteForm();
+    } catch (e) {
+      setDeleteStatus("error");
+      setDeleteStatusMessage(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  };
+
+  const allGuests = inviteesList.flatMap((invitee) => invitee.guests);
+  const totalAddedCount = allGuests.length;
+  const comingCount = allGuests.filter((guest) => guest.attending === true).length;
+  const notComingCount = allGuests.filter((guest) => guest.attending === false).length;
+  const noResponseCount = totalAddedCount - comingCount - notComingCount;
+  const familyInvitees = inviteesList.filter((invitee) => invitee.type === "family");
+  const individualInvitees = inviteesList.filter((invitee) => invitee.type === "individual");
+  const brideIndividuals = individualInvitees.filter(
+    (invitee) => (invitee.individualSide as IndividualSide | null) !== "groom"
+  );
+  const groomIndividuals = individualInvitees.filter(
+    (invitee) => (invitee.individualSide as IndividualSide | null) === "groom"
+  );
+
   return (
-    <div className="min-h-screen bg-background px-6 py-12 sm:px-12">
-      <div className="mx-auto max-w-3xl">
-        <div className="mb-8 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-background px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-5 flex items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Guest list</h1>
             <p className="mt-1 text-muted-foreground">
@@ -192,7 +351,7 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
           </Link>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -219,60 +378,145 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
           </Button>
         </div>
 
-        <div className="space-y-4">
-          {inviteesList.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Users className="h-12 w-12 text-muted-foreground" />
-                <p className="mt-2 font-medium">No invitees yet</p>
-                <p className="text-sm text-muted-foreground">
-                  Add a family or individual to get started
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            inviteesList.map((inv) => {
-              const link = `${baseUrl}/${inv.slug}`;
-              return (
-                <Card key={inv.id}>
-                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-2">
-                    <div>
-                      <CardTitle className="text-lg">{inv.displayName}</CardTitle>
-                      <CardDescription className="mt-0.5 capitalize">
-                        {inv.type}
-                      </CardDescription>
-                    </div>
-                    <Badge variant="secondary" className="shrink-0 capitalize">
-                      {inv.type}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex flex-wrap gap-2">
-                      {inv.guests.map((g) => (
-                        <div
-                          key={g.id}
-                          className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-2 py-1.5"
+        <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-md border px-2 py-1.5">
+            <p className="text-[10px] uppercase text-muted-foreground">Invited</p>
+            <p className="text-base font-semibold leading-none">{totalAddedCount}</p>
+          </div>
+          <div className="rounded-md border px-2 py-1.5">
+            <p className="text-[10px] uppercase text-muted-foreground">Coming</p>
+            <p className="text-base font-semibold leading-none text-green-600">{comingCount}</p>
+          </div>
+          <div className="rounded-md border px-2 py-1.5">
+            <p className="text-[10px] uppercase text-muted-foreground">No response</p>
+            <p className="text-base font-semibold leading-none text-muted-foreground">{noResponseCount}</p>
+          </div>
+          <div className="rounded-md border px-2 py-1.5">
+            <p className="text-[10px] uppercase text-muted-foreground">Not coming</p>
+            <p className="text-base font-semibold leading-none text-red-600">{notComingCount}</p>
+          </div>
+        </div>
+
+        {inviteesList.length === 0 ? (
+          <Card className="col-span-full">
+            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+              <Users className="h-12 w-12 text-muted-foreground" />
+              <p className="mt-2 font-medium">No invitees yet</p>
+              <p className="text-sm text-muted-foreground">
+                Add a family or individual to get started
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+              {familyInvitees.map((inv) => (
+                <Card key={inv.id} className="p-2">
+                  <CardContent className="flex flex-col p-2">
+                    <CardTitle className="line-clamp-2 flex items-center justify-between text-xs sm:text-sm">
+                      {inv.displayName}
+                      <div className="ml-1 flex items-center gap-0.5">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-fit px-2 text-xs"
+                          onClick={() => void copyInviteeLink(inv.slug, inv.id)}
                         >
-                          <span className="text-sm font-medium">{g.name}</span>
-                          <GuestStatusBadge guest={g} />
-                        </div>
+                          {copiedInviteeId === inv.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-7 w-fit px-2 text-xs">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEditModal(inv)}>Edit family</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => openDeleteModal(inv)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </CardTitle>
+                    <ul className="space-y-0.5">
+                      {inv.guests.map((g) => (
+                        <li key={g.id} className="flex items-center gap-1 text-[11px] font-medium sm:text-xs">
+                          <MemberStatusIcon attending={g.attending} />
+                          {g.name}
+                        </li>
                       ))}
-                    </div>
-                    <a
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-sm text-primary underline-offset-4 hover:underline"
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      {link}
-                    </a>
+                    </ul>
                   </CardContent>
                 </Card>
-              );
-            })
-          )}
-        </div>
+              ))}
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {[
+                { title: "Bride individuals", invitees: brideIndividuals },
+                { title: "Groom individuals", invitees: groomIndividuals },
+              ].map((group) => (
+                <Card key={group.title}>
+                  <CardContent className="p-2">
+                    <CardTitle className="text-xs sm:text-sm">{group.title}</CardTitle>
+                    <ul className="mt-1.5 space-y-1">
+                      {group.invitees.length === 0 ? (
+                        <li className="text-[11px] text-muted-foreground sm:text-xs">None</li>
+                      ) : (
+                        group.invitees.map((inv) => (
+                          <li key={inv.id} className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
+                            <span className="flex min-w-0 items-center gap-1 font-medium">
+                              <MemberStatusIcon attending={inv.guests[0]?.attending} />
+                              <span className="truncate">{inv.displayName}</span>
+                            </span>
+                            <span className="flex shrink-0 items-center gap-0.5">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-fit px-1.5"
+                                onClick={() => void copyInviteeLink(inv.slug, inv.id)}
+                              >
+                                {copiedInviteeId === inv.id ? (
+                                  <Check className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="icon" variant="ghost" className="h-6 w-fit px-1.5">
+                                    <MoreVertical className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditModal(inv)}>
+                                    Edit individual
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteModal(inv)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
 
         {/* Add family dialog */}
         <Dialog
@@ -410,6 +654,18 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
                   placeholder="e.g. juan-dela-cruz"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="ind-side">Side</Label>
+                <select
+                  id="ind-side"
+                  value={indSide}
+                  onChange={(e) => setIndSide(e.target.value as IndividualSide)}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none"
+                >
+                  <option value="bride">Bride</option>
+                  <option value="groom">Groom</option>
+                </select>
+              </div>
               {indStatus === "success" && indStatusMessage && (
                 <Alert variant="default">
                   <AlertTitle>Success</AlertTitle>
@@ -437,6 +693,137 @@ export function AdminClient({ invitees, baseUrl, adminKey }: AdminClientProps) {
                 disabled={indStatus === "submitting"}
               >
                 {indStatus === "submitting" ? "Saving…" : "Save"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit invitee dialog */}
+        <Dialog
+          open={editOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) resetEditForm();
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>{editType === "family" ? "Edit family" : "Edit individual"}</DialogTitle>
+              <DialogDescription>Update invitee details and members.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-display-name">Display name</Label>
+                <Input
+                  id="edit-display-name"
+                  value={editDisplayName}
+                  onChange={(e) => setEditDisplayName(e.target.value)}
+                  placeholder="e.g. Santos Family"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-slug">URL slug</Label>
+                <Input
+                  id="edit-slug"
+                  value={editSlug}
+                  onChange={(e) => setEditSlug(e.target.value)}
+                  placeholder="e.g. santos"
+                />
+              </div>
+              {editType === "individual" && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-side">Side</Label>
+                  <select
+                    id="edit-side"
+                    value={editSide}
+                    onChange={(e) => setEditSide(e.target.value as IndividualSide)}
+                    className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none"
+                  >
+                    <option value="bride">Bride</option>
+                    <option value="groom">Groom</option>
+                  </select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label>{editType === "family" ? "Family members" : "Member name"}</Label>
+                {editMembers.map((name, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input
+                      value={name}
+                      onChange={(e) => updateEditMember(i, e.target.value)}
+                      placeholder="Name"
+                      className="flex-1"
+                    />
+                    {editType === "family" && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        type="button"
+                        onClick={() => removeEditMember(i)}
+                        disabled={editMembers.length <= 1}
+                      >
+                        −
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {editType === "family" && (
+                  <Button variant="outline" size="sm" type="button" onClick={addEditMember}>
+                    + Add member
+                  </Button>
+                )}
+              </div>
+              {editStatus === "success" && editStatusMessage && (
+                <Alert variant="default">
+                  <AlertTitle>Success</AlertTitle>
+                  <AlertDescription>{editStatusMessage}</AlertDescription>
+                </Alert>
+              )}
+              {editStatus === "error" && editStatusMessage && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{editStatusMessage}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setEditOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={submitEdit} disabled={editStatus === "submitting"}>
+                {editStatus === "submitting" ? "Saving…" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete confirm dialog */}
+        <Dialog
+          open={deleteOpen}
+          onOpenChange={(open) => {
+            setDeleteOpen(open);
+            if (!open) resetDeleteForm();
+          }}
+        >
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Delete family</DialogTitle>
+              <DialogDescription>
+                This will permanently remove <span className="font-medium">{deleteInviteeName}</span> and all members.
+              </DialogDescription>
+            </DialogHeader>
+            {deleteStatus === "error" && deleteStatusMessage && (
+              <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{deleteStatusMessage}</AlertDescription>
+              </Alert>
+            )}
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setDeleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" type="button" onClick={submitDelete} disabled={deleteStatus === "submitting"}>
+                {deleteStatus === "submitting" ? "Deleting…" : "Delete"}
               </Button>
             </DialogFooter>
           </DialogContent>

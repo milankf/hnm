@@ -25,7 +25,6 @@ export default async function AdminPage({ searchParams }: Props) {
   return (
     <AdminClient
       invitees={inviteesWithGuests}
-      baseUrl={process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000"}
       adminKey={key ?? undefined}
     />
   );

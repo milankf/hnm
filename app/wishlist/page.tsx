@@ -1,30 +1,34 @@
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 
-const WISHLIST_ITEMS = [
-  "4 bread toaster",
-  "Microwave",
-  "Induction stove",
-  "Coffee maker",
-  "Air purifier",
-  "Air fryer",
-  "Pan set",
-  "Shower heater",
-  "Handheld vacuum",
-  "Stand mixer",
-  "Robot vacuum",
-  "Yankee candles",
-  "Wifi printer",
-  "Speaker (sound system)",
-  "Standing table",
-];
-
-const PLACEHOLDER_THEMES = [
-  "from-rose-200 to-rose-100",
-  "from-amber-200 to-yellow-100",
-  "from-emerald-200 to-emerald-100",
-  "from-cyan-200 to-sky-100",
-  "from-violet-200 to-fuchsia-100",
+const WISHLIST_CATEGORIES = [
+  {
+    title: "Kitchen & appliances",
+    items: [
+      "Bread toaster",
+      "Microwave",
+      "Induction stove",
+      "Coffee maker",
+      "Stand mixer",
+      "Pots & pans",
+    ],
+  },
+  {
+    title: "Electronic & games",
+    items: ["Wifi printer", "Speaker (sound system)", "Standing table"],
+  },
+  {
+    title: "Home essentials",
+    items: ["Air purifier", "Air fryer", "Handheld vacuum", "Robot vacuum", "Humidifier"],
+  },
+  {
+    title: "Bathroom",
+    items: ["Shower heater", "Bathrobes"],
+  },
+  {
+    title: "Luggage & travel",
+    items: ["Luggage set", "Carry-on bag", "Tracker"],
+  },
 ];
 
 export default function WishlistPage() {
@@ -49,30 +53,21 @@ export default function WishlistPage() {
         </header>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {WISHLIST_ITEMS.map((item, index) => (
+          {WISHLIST_CATEGORIES.map((category) => (
             <article
-              key={item}
-              className="overflow-hidden rounded-2xl border border-black/10 bg-white/70 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-sm"
+              key={category.title}
+              className="rounded-2xl border border-black/10 bg-white/70 p-5 shadow-[0_10px_30px_rgba(0,0,0,0.08)] backdrop-blur-sm sm:p-6"
             >
-              <div
-                className={`relative aspect-[4/3] bg-gradient-to-br ${
-                  PLACEHOLDER_THEMES[index % PLACEHOLDER_THEMES.length]
-                }`}
-              >
-                <div
-                  className="absolute inset-0 opacity-35"
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.9), transparent 32%), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.7), transparent 35%)",
-                  }}
-                />
-                <p className="absolute left-3 top-3 rounded-sm bg-black/55 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] text-white">
-                  Placeholder photo
-                </p>
-              </div>
-              <div className="p-4 sm:p-5">
-                <p className="font-mono text-base font-semibold text-neutral-900 sm:text-lg">{item}</p>
-              </div>
+              <h2 className="font-mono text-lg font-extrabold uppercase tracking-[0.08em] text-neutral-900 sm:text-xl">
+                {category.title}
+              </h2>
+              <ul className="mt-4 space-y-2">
+                {category.items.map((item) => (
+                  <li key={item} className="font-mono text-sm text-neutral-800 sm:text-base">
+                    {item}
+                  </li>
+                ))}
+              </ul>
             </article>
           ))}
         </div>
