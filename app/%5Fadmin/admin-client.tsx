@@ -40,10 +40,14 @@ import type { Invitee, Guest } from "@/db/schema";
 
 type InviteeWithGuests = Invitee & { guests: Guest[] };
 type IndividualSide = "bride" | "groom";
+type BulkStatus = "idle" | "submitting" | "success" | "error";
+type ParsedFamilyBlock = {
+  displayName: string;
+  memberNames: string[];
+};
 
 type AdminClientProps = {
   invitees: InviteeWithGuests[];
-  adminKey?: string;
 };
 
 function slugify(s: string): string {
@@ -51,6 +55,58 @@ function slugify(s: string): string {
     .toLowerCase()
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9-]/g, "");
+}
+
+function buildUniqueSlug(base: string, usedSlugs: Set<string>): string {
+  const normalizedBase = base.trim() || "invitee";
+  let candidate = normalizedBase;
+  let suffix = 2;
+  while (usedSlugs.has(candidate)) {
+    candidate = `${normalizedBase}-${suffix}`;
+    suffix += 1;
+  }
+  usedSlugs.add(candidate);
+  return candidate;
+}
+
+function parseBulkFamilies(input: string): ParsedFamilyBlock[] {
+  const blocks = input
+    .split(/\n\s*\n+/)
+    .map((block) =>
+      block
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+    )
+    .filter((lines) => lines.length > 0);
+
+  if (blocks.length === 0) {
+    throw new Error("Paste at least one family block.");
+  }
+
+  return blocks.map((lines, index) => {
+    const displayName = lines[0];
+    const memberNames = lines.slice(1);
+    if (!displayName) {
+      throw new Error(`Family block ${index + 1} is missing a family name.`);
+    }
+    if (memberNames.length === 0) {
+      throw new Error(`Family block ${index + 1} needs at least one member name.`);
+    }
+    return { displayName, memberNames };
+  });
+}
+
+function parseBulkIndividuals(input: string): string[] {
+  const names = input
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (names.length === 0) {
+    throw new Error("Paste at least one name.");
+  }
+  return names;
 }
 
 function MemberStatusIcon({ attending }: { attending: boolean | null | undefined }) {
@@ -63,14 +119,15 @@ function MemberStatusIcon({ attending }: { attending: boolean | null | undefined
   return <CircleMinus className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />;
 }
 
-export function AdminClient({ invitees, adminKey }: AdminClientProps) {
+export function AdminClient({ invitees }: AdminClientProps) {
   const headers: HeadersInit = {
     "Content-Type": "application/json",
-    ...(adminKey && { Authorization: `Bearer ${adminKey}` }),
   };
   const [inviteesList, setInviteesList] = useState(invitees);
   const [familyOpen, setFamilyOpen] = useState(false);
   const [individualOpen, setIndividualOpen] = useState(false);
+  const [bulkFamiliesOpen, setBulkFamiliesOpen] = useState(false);
+  const [bulkIndividualsOpen, setBulkIndividualsOpen] = useState(false);
   const [familyDisplayName, setFamilyDisplayName] = useState("");
   const [familySlug, setFamilySlug] = useState("");
   const [familyMembers, setFamilyMembers] = useState(["", ""]);
@@ -81,6 +138,13 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
   const [familyStatusMessage, setFamilyStatusMessage] = useState("");
   const [indStatus, setIndStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [indStatusMessage, setIndStatusMessage] = useState("");
+  const [bulkFamiliesText, setBulkFamiliesText] = useState("");
+  const [bulkFamiliesStatus, setBulkFamiliesStatus] = useState<BulkStatus>("idle");
+  const [bulkFamiliesStatusMessage, setBulkFamiliesStatusMessage] = useState("");
+  const [bulkIndividualsText, setBulkIndividualsText] = useState("");
+  const [bulkIndividualsSide, setBulkIndividualsSide] = useState<IndividualSide>("bride");
+  const [bulkIndividualsStatus, setBulkIndividualsStatus] = useState<BulkStatus>("idle");
+  const [bulkIndividualsStatusMessage, setBulkIndividualsStatusMessage] = useState("");
   const [copiedInviteeId, setCopiedInviteeId] = useState<string | null>(null);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -113,6 +177,19 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
     setIndSide("bride");
     setIndStatus("idle");
     setIndStatusMessage("");
+  };
+
+  const resetBulkFamiliesForm = () => {
+    setBulkFamiliesText("");
+    setBulkFamiliesStatus("idle");
+    setBulkFamiliesStatusMessage("");
+  };
+
+  const resetBulkIndividualsForm = () => {
+    setBulkIndividualsText("");
+    setBulkIndividualsSide("bride");
+    setBulkIndividualsStatus("idle");
+    setBulkIndividualsStatusMessage("");
   };
 
   const resetEditForm = () => {
@@ -220,6 +297,124 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
     }
   };
 
+  const submitBulkFamilies = async () => {
+    setBulkFamiliesStatus("submitting");
+    setBulkFamiliesStatusMessage("");
+
+    try {
+      const parsedFamilies = parseBulkFamilies(bulkFamiliesText);
+      const usedSlugs = new Set(inviteesList.map((inv) => inv.slug));
+      const createdInvitees: InviteeWithGuests[] = [];
+      const errors: string[] = [];
+
+      for (const family of parsedFamilies) {
+        const slug = buildUniqueSlug(slugify(family.displayName) || "family", usedSlugs);
+        try {
+          const res = await fetch("/api/admin/invitees", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              type: "family",
+              displayName: family.displayName,
+              slug,
+              memberNames: family.memberNames,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error((data as { error?: string }).error ?? "Failed to create family");
+          }
+          const payload = data as { invitee: Invitee; guests: Guest[] };
+          createdInvitees.push({ ...payload.invitee, guests: payload.guests });
+        } catch (err) {
+          errors.push(`${family.displayName}: ${err instanceof Error ? err.message : "Failed"}`);
+        }
+      }
+
+      if (createdInvitees.length > 0) {
+        setInviteesList((prev) => [...prev, ...createdInvitees]);
+      }
+
+      if (errors.length === 0) {
+        setBulkFamiliesStatus("success");
+        setBulkFamiliesStatusMessage(`Imported ${createdInvitees.length} families.`);
+        window.setTimeout(() => {
+          setBulkFamiliesOpen(false);
+          resetBulkFamiliesForm();
+        }, 1200);
+        return;
+      }
+
+      setBulkFamiliesStatus("error");
+      setBulkFamiliesStatusMessage(
+        `Imported ${createdInvitees.length}/${parsedFamilies.length}. ${errors.slice(0, 2).join(" | ")}`
+      );
+    } catch (err) {
+      setBulkFamiliesStatus("error");
+      setBulkFamiliesStatusMessage(err instanceof Error ? err.message : "Failed to import families.");
+    }
+  };
+
+  const submitBulkIndividuals = async () => {
+    setBulkIndividualsStatus("submitting");
+    setBulkIndividualsStatusMessage("");
+
+    try {
+      const parsedNames = parseBulkIndividuals(bulkIndividualsText);
+      const usedSlugs = new Set(inviteesList.map((inv) => inv.slug));
+      const createdInvitees: InviteeWithGuests[] = [];
+      const errors: string[] = [];
+
+      for (const name of parsedNames) {
+        const slug = buildUniqueSlug(slugify(name) || "invitee", usedSlugs);
+        try {
+          const res = await fetch("/api/admin/invitees", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              type: "individual",
+              individualSide: bulkIndividualsSide,
+              displayName: name,
+              slug,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error((data as { error?: string }).error ?? "Failed to create individual");
+          }
+          const payload = data as { invitee: Invitee; guests: Guest[] };
+          createdInvitees.push({ ...payload.invitee, guests: payload.guests });
+        } catch (err) {
+          errors.push(`${name}: ${err instanceof Error ? err.message : "Failed"}`);
+        }
+      }
+
+      if (createdInvitees.length > 0) {
+        setInviteesList((prev) => [...prev, ...createdInvitees]);
+      }
+
+      if (errors.length === 0) {
+        setBulkIndividualsStatus("success");
+        setBulkIndividualsStatusMessage(
+          `Imported ${createdInvitees.length} ${bulkIndividualsSide} individuals.`
+        );
+        window.setTimeout(() => {
+          setBulkIndividualsOpen(false);
+          resetBulkIndividualsForm();
+        }, 1200);
+        return;
+      }
+
+      setBulkIndividualsStatus("error");
+      setBulkIndividualsStatusMessage(
+        `Imported ${createdInvitees.length}/${parsedNames.length}. ${errors.slice(0, 2).join(" | ")}`
+      );
+    } catch (err) {
+      setBulkIndividualsStatus("error");
+      setBulkIndividualsStatusMessage(err instanceof Error ? err.message : "Failed to import names.");
+    }
+  };
+
   const copyInviteeLink = async (slug: string, inviteeId: string) => {
     const path = `/${slug}`;
     const fullUrl =
@@ -265,7 +460,7 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
           displayName: editDisplayName.trim(),
           slug: editSlug.trim(),
           individualSide: editType === "individual" ? editSide : undefined,
-          memberNames,
+          memberNames: editType === "family" ? memberNames : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -376,6 +571,28 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
             <UserPlus className="h-4 w-4" />
             Add individual
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => {
+              resetBulkFamiliesForm();
+              setBulkFamiliesOpen(true);
+            }}
+          >
+            Bulk families
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => {
+              resetBulkIndividualsForm();
+              setBulkIndividualsOpen(true);
+            }}
+          >
+            Bulk bride/groom
+          </Button>
         </div>
 
         <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -445,9 +662,9 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
                     </CardTitle>
                     <ul className="space-y-0.5">
                       {inv.guests.map((g) => (
-                        <li key={g.id} className="flex items-center gap-1 text-[11px] font-medium sm:text-xs">
+                        <li key={g.id} className="flex min-w-0 items-center gap-1 text-[11px] font-medium sm:text-xs">
                           <MemberStatusIcon attending={g.attending} />
-                          {g.name}
+                          <span className="truncate">{g.name}</span>
                         </li>
                       ))}
                     </ul>
@@ -698,6 +915,134 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
           </DialogContent>
         </Dialog>
 
+        {/* Bulk families dialog */}
+        <Dialog
+          open={bulkFamiliesOpen}
+          onOpenChange={(open) => {
+            setBulkFamiliesOpen(open);
+            if (!open) resetBulkFamiliesForm();
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Bulk add families</DialogTitle>
+              <DialogDescription>
+                Paste family blocks. First line is family name, next lines are members, blank line separates families.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <Label htmlFor="bulk-families-text">Families text</Label>
+              <textarea
+                id="bulk-families-text"
+                value={bulkFamiliesText}
+                onChange={(e) => setBulkFamiliesText(e.target.value)}
+                rows={12}
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-xs outline-none"
+                placeholder={`Sample Family
+Member 1
+Member 2
+
+Sample2 Family
+Member 3
+Member 4`}
+              />
+              {bulkFamiliesStatus === "success" && bulkFamiliesStatusMessage && (
+                <Alert variant="default">
+                  <AlertTitle>Success</AlertTitle>
+                  <AlertDescription>{bulkFamiliesStatusMessage}</AlertDescription>
+                </Alert>
+              )}
+              {bulkFamiliesStatus === "error" && bulkFamiliesStatusMessage && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{bulkFamiliesStatusMessage}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setBulkFamiliesOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={submitBulkFamilies}
+                disabled={bulkFamiliesStatus === "submitting"}
+              >
+                {bulkFamiliesStatus === "submitting" ? "Importing…" : "Import families"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Bulk individuals dialog */}
+        <Dialog
+          open={bulkIndividualsOpen}
+          onOpenChange={(open) => {
+            setBulkIndividualsOpen(open);
+            if (!open) resetBulkIndividualsForm();
+          }}
+        >
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Bulk add bride or groom individuals</DialogTitle>
+              <DialogDescription>
+                Paste one name per line and choose whether these names belong to bride or groom.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="bulk-individual-side">Side</Label>
+                <select
+                  id="bulk-individual-side"
+                  value={bulkIndividualsSide}
+                  onChange={(e) => setBulkIndividualsSide(e.target.value as IndividualSide)}
+                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none"
+                >
+                  <option value="bride">Bride</option>
+                  <option value="groom">Groom</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bulk-individual-text">Names</Label>
+                <textarea
+                  id="bulk-individual-text"
+                  value={bulkIndividualsText}
+                  onChange={(e) => setBulkIndividualsText(e.target.value)}
+                  rows={12}
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm shadow-xs outline-none"
+                  placeholder={`Friend 1
+Friend 2
+Friend 3`}
+                />
+              </div>
+              {bulkIndividualsStatus === "success" && bulkIndividualsStatusMessage && (
+                <Alert variant="default">
+                  <AlertTitle>Success</AlertTitle>
+                  <AlertDescription>{bulkIndividualsStatusMessage}</AlertDescription>
+                </Alert>
+              )}
+              {bulkIndividualsStatus === "error" && bulkIndividualsStatusMessage && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{bulkIndividualsStatusMessage}</AlertDescription>
+                </Alert>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setBulkIndividualsOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={submitBulkIndividuals}
+                disabled={bulkIndividualsStatus === "submitting"}
+              >
+                {bulkIndividualsStatus === "submitting" ? "Importing…" : "Import individuals"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Edit invitee dialog */}
         <Dialog
           open={editOpen}
@@ -713,12 +1058,12 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-display-name">Display name</Label>
+                <Label htmlFor="edit-display-name">{editType === "family" ? "Display name" : "Name"}</Label>
                 <Input
                   id="edit-display-name"
                   value={editDisplayName}
                   onChange={(e) => setEditDisplayName(e.target.value)}
-                  placeholder="e.g. Santos Family"
+                  placeholder={editType === "family" ? "e.g. Santos Family" : "e.g. Juan Dela Cruz"}
                 />
               </div>
               <div className="space-y-2">
@@ -744,17 +1089,17 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
                   </select>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label>{editType === "family" ? "Family members" : "Member name"}</Label>
-                {editMembers.map((name, i) => (
-                  <div key={i} className="flex gap-2">
-                    <Input
-                      value={name}
-                      onChange={(e) => updateEditMember(i, e.target.value)}
-                      placeholder="Name"
-                      className="flex-1"
-                    />
-                    {editType === "family" && (
+              {editType === "family" && (
+                <div className="space-y-2">
+                  <Label>Family members</Label>
+                  {editMembers.map((name, i) => (
+                    <div key={i} className="flex gap-2">
+                      <Input
+                        value={name}
+                        onChange={(e) => updateEditMember(i, e.target.value)}
+                        placeholder="Name"
+                        className="flex-1"
+                      />
                       <Button
                         variant="outline"
                         size="icon"
@@ -764,15 +1109,13 @@ export function AdminClient({ invitees, adminKey }: AdminClientProps) {
                       >
                         −
                       </Button>
-                    )}
-                  </div>
-                ))}
-                {editType === "family" && (
+                    </div>
+                  ))}
                   <Button variant="outline" size="sm" type="button" onClick={addEditMember}>
                     + Add member
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
               {editStatus === "success" && editStatusMessage && (
                 <Alert variant="default">
                   <AlertTitle>Success</AlertTitle>

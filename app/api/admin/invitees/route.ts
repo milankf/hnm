@@ -3,11 +3,24 @@ import { db } from "@/lib/db";
 import { invitees, guests } from "@/db/schema";
 import { and, asc, eq, ne } from "drizzle-orm";
 
-export async function POST(request: NextRequest) {
-  const adminSecret = process.env.ADMIN_SECRET;
+function getAdminPin() {
+  return process.env.ADMIN_PIN ?? process.env.ADMIN_SECRET ?? "";
+}
+
+function isAuthorized(request: NextRequest) {
+  const adminPin = getAdminPin();
+  if (!adminPin) return true;
+
   const authHeader = request.headers.get("authorization");
-  const key = authHeader?.replace("Bearer ", "") ?? new URL(request.url).searchParams.get("key");
-  if (adminSecret && key !== adminSecret) {
+  const bearerKey = authHeader?.replace("Bearer ", "").trim() || "";
+  const queryKey = new URL(request.url).searchParams.get("key") ?? "";
+  const cookiePin = request.cookies.get("admin_pin")?.value ?? "";
+
+  return bearerKey === adminPin || queryKey === adminPin || cookiePin === adminPin;
+}
+
+export async function POST(request: NextRequest) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -96,10 +109,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  const authHeader = request.headers.get("authorization");
-  const key = authHeader?.replace("Bearer ", "") ?? new URL(request.url).searchParams.get("key");
-  if (adminSecret && key !== adminSecret) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -208,10 +218,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const adminSecret = process.env.ADMIN_SECRET;
-  const authHeader = request.headers.get("authorization");
-  const key = authHeader?.replace("Bearer ", "") ?? new URL(request.url).searchParams.get("key");
-  if (adminSecret && key !== adminSecret) {
+  if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
