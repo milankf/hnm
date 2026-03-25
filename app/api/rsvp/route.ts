@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { guests } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { RSVP_CLOSED_MESSAGE, isRsvpClosed } from "@/lib/rsvp-deadline";
 
 export async function POST(request: NextRequest) {
   try {
+    if (isRsvpClosed()) {
+      return NextResponse.json(
+        { error: RSVP_CLOSED_MESSAGE },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { inviteeId, responses } = body as {
       inviteeId: string;

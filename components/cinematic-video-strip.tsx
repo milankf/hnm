@@ -142,6 +142,7 @@ export function CinematicVideoStrip({
   className = "",
 }: CinematicVideoStripProps) {
   const rootRef = useRef<HTMLElement>(null);
+  const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const [traveledVhState, setTraveledVhState] = useState(0);
 
   const stepVh = frameHeightVh + gapVh;
@@ -175,6 +176,7 @@ export function CinematicVideoStrip({
         },
       ]
     : [];
+  const renderedSceneCount = renderedScenes.length;
 
   const stripYRaw = useMotionValue(initialStripYVh);
   const stripY = useTransform(stripYRaw, (v) => `${v}vh`);
@@ -242,6 +244,54 @@ export function CinematicVideoStrip({
     transitionVh,
   ]);
 
+  const activeSceneIndex = useMemo(() => {
+    if (!scenes.length) return -1;
+    const traveledVh = clamp(traveledVhState, 0, scrollTrackVh);
+
+    for (let i = 0; i < scenes.length; i += 1) {
+      const holdStartVh = sceneStartVh[i];
+      const holdEndVh = holdStartVh + holdVhByScene[i];
+
+      if (traveledVh <= holdEndVh || i === scenes.length - 1) {
+        return i;
+      }
+
+      const transitionEndVh = holdEndVh + transitionVh;
+      if (traveledVh < transitionEndVh) {
+        const transitionProgress = (traveledVh - holdEndVh) / transitionVh;
+        return transitionProgress < 0.5 ? i : i + 1;
+      }
+    }
+
+    return scenes.length - 1;
+  }, [holdVhByScene, sceneStartVh, scenes.length, scrollTrackVh, transitionVh, traveledVhState]);
+
+  const activeRenderedIndex = activeSceneIndex >= 0 ? activeSceneIndex + 1 : 0;
+
+  useEffect(() => {
+    if (!renderedSceneCount) return;
+
+    const playMin = activeRenderedIndex - 1;
+    const playMax = activeRenderedIndex + 1;
+
+    Object.entries(videoRefs.current).forEach(([indexKey, element]) => {
+      if (!element) return;
+      const index = Number(indexKey);
+      const shouldPlay = index >= playMin && index <= playMax;
+
+      if (shouldPlay) {
+        if (!element.paused) return;
+        const playPromise = element.play();
+        if (playPromise && typeof playPromise.catch === "function") {
+          playPromise.catch(() => {});
+        }
+        return;
+      }
+
+      if (!element.paused) element.pause();
+    });
+  }, [activeRenderedIndex, renderedSceneCount]);
+
   return (
     <main ref={rootRef} className={`relative min-h-screen w-full ${className}`}>
       <div className="fixed inset-0 z-0 overflow-hidden p-2 sm:p-0" style={{ backgroundColor }}>
@@ -253,7 +303,7 @@ export function CinematicVideoStrip({
             gap: `${gapVh}vh`,
           }}
         >
-          {renderedScenes.map((scene) => {
+          {renderedScenes.map((scene, renderedIndex) => {
             let sceneContent: ReactNode = null;
             if (typeof scene.content === "function") {
               sceneContent =
@@ -275,6 +325,12 @@ export function CinematicVideoStrip({
               sceneContent = scene.content ?? null;
             }
 
+            const distanceFromActive = Math.abs(renderedIndex - activeRenderedIndex);
+            const shouldPlayVideo = distanceFromActive <= 1;
+            const shouldLoadVideo = distanceFromActive <= 2;
+            const preloadMode: "none" | "metadata" | "auto" =
+              shouldPlayVideo ? "auto" : shouldLoadVideo ? "metadata" : "none";
+
             return (
               <div
                 key={scene.id}
@@ -285,13 +341,25 @@ export function CinematicVideoStrip({
                 }}
               >
                 <video
-                  src={scene.videoSrc}
+                  ref={(el) => {
+                    videoRefs.current[renderedIndex] = el;
+                  }}
+                  src={shouldLoadVideo ? scene.videoSrc : undefined}
                   poster={scene.poster}
-                  autoPlay
+                  autoPlay={shouldPlayVideo}
                   muted
                   loop
                   playsInline
-                  preload="auto"
+                  preload={shouldLoadVideo ? preloadMode : "none"}
+                  onLoadedData={(event) => {
+                    if (!shouldPlayVideo) return;
+                    const video = event.currentTarget;
+                    if (!video.paused) return;
+                    const playPromise = video.play();
+                    if (playPromise && typeof playPromise.catch === "function") {
+                      playPromise.catch(() => {});
+                    }
+                  }}
                   className={`h-full w-full rounded-xl object-cover bg-black ${scene.videoClassName ?? ""}`}
                   style={videoBlur > 0 ? { filter: `blur(${videoBlur}px)` } : undefined}
                 />

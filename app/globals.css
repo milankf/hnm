@@ -139,6 +139,36 @@
   animation: cinematic-gate-weave 4s ease-in-out infinite;
 }
 
+.rsvp-scroll-panel {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.4) rgba(0, 0, 0, 0.22);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.rsvp-scroll-panel::-webkit-scrollbar {
+  width: 10px;
+  background: transparent;
+}
+
+.rsvp-scroll-panel::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 9999px;
+  margin-block: 8px;
+}
+
+.rsvp-scroll-panel::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.36);
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background-clip: content-box;
+}
+
+.rsvp-scroll-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+  background-clip: content-box;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Guest, Invitee } from "@/db/schema";
+import { RSVP_CLOSED_MESSAGE, RSVP_DEADLINE_LABEL, isRsvpClosed } from "@/lib/rsvp-deadline";
 
 const WEDDING_DATE_TARGET = new Date("2026-08-20T15:00:00+08:00");
 
@@ -35,20 +36,20 @@ const PROGRAM_ITEMS = [
 ];
 
 const SECTION_TWO_CAROUSEL_PHOTOS = [
-  { src: "/carousel_1.webp", caption: "where it all began" },
-  { src: "/carousel_busay.webp" },
-  { src: "/carousel_peppa.webp" },
-  { src: "/carousel_sg.jpeg", caption: "travels..." },
-  { src: "/carousel_thai.jpeg" },
-  { src: "/carousel_bar.webp" },
-  { src: "/carousel_cablecar.webp" },
-  { src: "/carousel_penny.jpg", caption: "milestones" },
-  { src: "/carousel_melvin.JPG" },
-  { src: "/carousel_tavolata.webp", caption: "dates" },
-  { src: "/carousel_palawan.webp" },
-  { src: "/carousel_tagaytay.webp" },
-  { src: "/carousel_oceanpark.webp" },
-  { src: "/carousel_motor.webp" },
+  { src: "/images/carousel/carousel_1.webp", caption: "where it all began" },
+  { src: "/images/carousel/carousel_busay.webp" },
+  { src: "/images/carousel/carousel_peppa.webp" },
+  { src: "/images/carousel/carousel_sg.jpeg", caption: "travels..." },
+  { src: "/images/carousel/carousel_thai.jpeg" },
+  { src: "/images/carousel/carousel_bar.webp" },
+  { src: "/images/carousel/carousel_cablecar.webp" },
+  { src: "/images/carousel/carousel_penny.jpg", caption: "milestones" },
+  { src: "/images/carousel/carousel_melvin.JPG" },
+  { src: "/images/carousel/carousel_tavolata.webp", caption: "dates" },
+  { src: "/images/carousel/carousel_palawan.webp" },
+  { src: "/images/carousel/carousel_tagaytay.webp" },
+  { src: "/images/carousel/carousel_oceanpark.webp" },
+  { src: "/images/carousel/carousel_motor.webp" },
 ];
 
 const STORY_CAROUSEL_HOLD_VH = Math.max(100, SECTION_TWO_CAROUSEL_PHOTOS.length * 14);
@@ -232,6 +233,7 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
                 alt={`Wedding memory ${index + 1}`}
                 width={720}
                 height={480}
+                sizes="(max-width: 640px) 60vw, (max-width: 1024px) 34vw, 26vw"
                 className="aspect-square w-full rounded-md object-cover"
               />
               {photo.caption && (
@@ -272,15 +274,15 @@ function SceneTwoCountdown({ holdProgress }: { holdProgress: number }) {
   ];
   const dateText = "AUGUST 20, 2026 (THU)";
   const timeText = "3:00 PM";
-  const unitDuration = 0.16;
-  const unitGap = 0.04;
-  const sequenceStart = 0.06;
+  const unitDuration = 0.12;
+  const unitGap = 0.025;
+  const sequenceStart = 0.04;
   const dateTypeStart = sequenceStart;
-  const dateTypeDuration = 0.24;
+  const dateTypeDuration = 0.17;
   const dateTypeProgress = Math.max(0, Math.min(1, (holdProgress - dateTypeStart) / dateTypeDuration));
   const dateVisibleLength = Math.min(dateText.length, Math.floor(dateTypeProgress * (dateText.length + 1)));
   const timeTypeStart = sequenceStart;
-  const timeTypeDuration = 0.2;
+  const timeTypeDuration = 0.15;
   const timeTypeProgress = Math.max(0, Math.min(1, (holdProgress - timeTypeStart) / timeTypeDuration));
   const timeVisibleLength = Math.min(timeText.length, Math.floor(timeTypeProgress * (timeText.length + 1)));
 
@@ -385,6 +387,7 @@ function VenueRevealScene({
           alt={imageAlt}
           width={720}
           height={480}
+          sizes="(max-width: 640px) 100vw, 520px"
           className="h-56 w-full object-cover sm:h-64"
         />
         <a
@@ -406,7 +409,7 @@ function SceneThreeVenue({ holdProgress }: { holdProgress: number }) {
       holdProgress={holdProgress}
       header="Please join us at..."
       venueText="Redemptorist Church"
-      imageSrc="/redemptorist.jpg"
+      imageSrc="/images/venues/redemptorist.jpg"
       imageAlt="Redemptorist Church"
       mapsLink="https://maps.app.goo.gl/KoUTB73YiY9NqnJeA"
     />
@@ -419,7 +422,7 @@ function SceneFourVenue({ holdProgress }: { holdProgress: number }) {
       holdProgress={holdProgress}
       header="And..."
       venueText="Beverly View Events Pavillion"
-      imageSrc="/beverly.jpg"
+      imageSrc="/images/venues/beverly.jpg"
       imageAlt="Beverly View Events Pavilion"
       mapsLink="https://maps.app.goo.gl/BexKk87q2VL8twJv8"
     />
@@ -429,6 +432,9 @@ function SceneFourVenue({ holdProgress }: { holdProgress: number }) {
 function SceneFiveProgram({ holdProgress }: { holdProgress: number }) {
   const total = PROGRAM_ITEMS.length;
   const revealWindow = 1 / (total + 0.6);
+  const programRevealEnd = total * revealWindow;
+  const noteStart = Math.min(programRevealEnd + 0.01, 0.9);
+  const noteProgress = Math.min(Math.max((holdProgress - noteStart) / 0.08, 0), 1);
 
   return (
     <div
@@ -439,54 +445,90 @@ function SceneFiveProgram({ holdProgress }: { holdProgress: number }) {
       }}
     >
       <div className="flex flex-1 items-center justify-center px-2 py-4">
-        <div className="w-full max-w-[860px]">
+        <div className="w-full max-w-[860px] rounded-lg border border-white/35 bg-black/45 px-4 py-5 sm:px-6 sm:py-6">
           <p className="mb-3 text-center font-mono text-2xl font-extrabold tracking-[0.06em] text-white sm:mb-5 sm:text-4xl">
             What&apos;s the plan?
           </p>
           <div className="space-y-1.5 sm:space-y-2">
-          {PROGRAM_ITEMS.map((item, index) => {
-            const fromLeft = index % 2 === 0;
-            const start = index * revealWindow;
-            const progress = Math.min(Math.max((holdProgress - start) / revealWindow, 0), 1);
-            const startX = fromLeft ? -120 : 120;
-            const translateX = startX * (1 - progress);
+            {PROGRAM_ITEMS.map((item, index) => {
+              const fromLeft = index % 2 === 0;
+              const start = index * revealWindow;
+              const progress = Math.min(Math.max((holdProgress - start) / revealWindow, 0), 1);
+              const startX = fromLeft ? -120 : 120;
+              const translateX = startX * (1 - progress);
 
-            return (
-              <div
-                key={`${item.time}-${item.title}`}
-                className="font-mono text-center"
-                style={{
-                  transform: `translateX(${translateX}px)`,
-                  opacity: progress,
-                }}
-              >
-                <p className="text-base font-medium sm:text-2xl">
-                  <span className="font-bold tracking-[0.08em]">{item.time}</span>
-                  <span className="mx-2 text-white/70">-</span>
-                  <span>{item.title}</span>
-                </p>
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={`${item.time}-${item.title}`}
+                  className="font-mono text-center"
+                  style={{
+                    transform: `translateX(${translateX}px)`,
+                    opacity: progress,
+                  }}
+                >
+                  <p className="text-base font-medium sm:text-2xl">
+                    <span className="font-bold tracking-[0.08em]">{item.time}</span>
+                    <span className="mx-2 text-white/70">-</span>
+                    <span>{item.title}</span>
+                  </p>
+                </div>
+              );
+            })}
           </div>
+          <p
+            className="mx-auto mt-5 max-w-3xl text-center font-mono text-[11px] leading-relaxed text-white/85 sm:mt-6 sm:text-sm"
+            style={{
+              opacity: noteProgress,
+              transform: `translateY(${(1 - noteProgress) * 10}px)`,
+            }}
+          >
+            We have chosen to hold an intimate wedding so that we may celebrate this meaningful
+            milestone with the people who matter most to us.
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-function DressCodeColorDots({ includeWhite = true }: { includeWhite?: boolean }) {
+function DressCodeColorDots({
+  includeWhite = true,
+  revealProgress = 1,
+}: {
+  includeWhite?: boolean;
+  revealProgress?: number;
+}) {
+  const clampedReveal = Math.min(Math.max(revealProgress, 0), 1);
+  const colors = includeWhite
+    ? [
+        "bg-black border-white/40",
+        "bg-white border-white/50",
+        "bg-blue-500 border-white/40",
+        "bg-[#1f2a44] border-white/40",
+      ]
+    : ["bg-black border-white/40", "bg-blue-500 border-white/40", "bg-[#1f2a44] border-white/40"];
+
   return (
     <div
       className="mt-3 flex items-center gap-3 sm:mt-4 sm:gap-4"
       aria-label="Avoid black, white, blue, and navy blue"
     >
-      <span className="inline-block h-7 w-7 rounded-full border border-white/40 bg-black sm:h-9 sm:w-9" />
-      {includeWhite && (
-        <span className="inline-block h-7 w-7 rounded-full border border-white/50 bg-white sm:h-9 sm:w-9" />
-      )}
-      <span className="inline-block h-7 w-7 rounded-full border border-white/40 bg-blue-500 sm:h-9 sm:w-9" />
-      <span className="inline-block h-7 w-7 rounded-full border border-white/40 bg-[#1f2a44] sm:h-9 sm:w-9" />
+      {colors.map((colorClass, index) => {
+        const dotStart = 0.08 + index * 0.16;
+        const dotProgress = Math.min(Math.max((clampedReveal - dotStart) / 0.22, 0), 1);
+        const dotScale = 0.55 + dotProgress * 0.45;
+        return (
+          <span
+            key={`${colorClass}-${index}`}
+            className={`inline-block h-7 w-7 rounded-full border sm:h-9 sm:w-9 ${colorClass}`}
+            style={{
+              opacity: dotProgress,
+              transform: `scale(${dotScale})`,
+              transformOrigin: "center",
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -497,13 +539,26 @@ function DressCodePanel({
   imageAlt,
   portraitImage = false,
   includeWhiteColor = true,
+  revealProgress = 1,
+  colorDotsProgress = 1,
 }: {
   label: string;
   imageSrc: string;
   imageAlt: string;
   portraitImage?: boolean;
   includeWhiteColor?: boolean;
+  revealProgress?: number;
+  colorDotsProgress?: number;
 }) {
+  const clampedReveal = Math.min(Math.max(revealProgress, 0), 1);
+  const clampedDotsReveal = Math.min(Math.max(colorDotsProgress, 0), 1);
+  const photoDevelopProgress = Math.min(Math.max((clampedReveal - 0.05) / 0.42, 0), 1);
+  const photoBlur = (1 - photoDevelopProgress) * 8;
+  const photoGrayscale = 1 - photoDevelopProgress;
+  const photoSaturate = 0.25 + photoDevelopProgress * 0.75;
+  const photoContrast = 0.85 + photoDevelopProgress * 0.15;
+  const photoOpacity = 0.45 + photoDevelopProgress * 0.55;
+
   return (
     <div className="grid items-center gap-3 rounded-lg border border-white/30 bg-black/30 p-3 sm:grid-cols-[1fr_1.2fr] sm:gap-5 sm:p-4">
       <Dialog>
@@ -519,11 +574,16 @@ function DressCodePanel({
                 alt={imageAlt}
                 width={640}
                 height={420}
+                sizes="(max-width: 640px) 52vw, 325px"
                 className={`block object-cover ${
                   portraitImage
                     ? "aspect-square w-[52vw] max-w-[275px] sm:w-[32vw] sm:max-w-[325px]"
                     : "h-32 w-full sm:h-40"
                 }`}
+                style={{
+                  filter: `grayscale(${photoGrayscale}) saturate(${photoSaturate}) contrast(${photoContrast}) blur(${photoBlur}px)`,
+                  opacity: photoOpacity,
+                }}
               />
             </button>
           </DialogTrigger>
@@ -556,6 +616,7 @@ function DressCodePanel({
               alt={imageAlt}
               width={1600}
               height={2200}
+              sizes="100vw"
               className="h-[calc(100vh-5.75rem)] w-auto max-w-full rounded-xl object-contain sm:h-[88vh] sm:max-w-[calc(100vw-3rem)]"
             />
           </div>
@@ -566,13 +627,17 @@ function DressCodePanel({
         <p className="mt-1 font-mono text-xs tracking-[0.08em] text-white/90 sm:text-sm">
           Please avoid wearing the following colors.
         </p>
-        <DressCodeColorDots includeWhite={includeWhiteColor} />
+        <DressCodeColorDots includeWhite={includeWhiteColor} revealProgress={clampedDotsReveal} />
       </div>
     </div>
   );
 }
 
-function SceneSixDressCodeLadies() {
+function SceneSixDressCodeLadies({ holdProgress }: { holdProgress: number }) {
+  const panelReveal = Math.min(Math.max((holdProgress - 0.06) / 0.28, 0), 1);
+  const panelTranslateX = (1 - panelReveal) * -90;
+  const dotsReveal = Math.min(Math.max((holdProgress - 0.56) / 0.32, 0), 1);
+
   return (
     <div
       className="flex h-full flex-col items-center justify-center p-4 text-white sm:p-6"
@@ -581,22 +646,34 @@ function SceneSixDressCodeLadies() {
           "0 2px 4px rgba(0,0,0,0.72), 0 0 14px rgba(0,0,0,0.5), 0 0 24px rgba(0,0,0,0.34)",
       }}
     >
-      <div className="w-full max-w-4xl">
+      <div
+        className="w-full max-w-4xl"
+        style={{
+          opacity: panelReveal,
+          transform: `translateX(${panelTranslateX}px)`,
+        }}
+      >
         <p className="mb-3 text-center font-mono text-2xl font-extrabold tracking-[0.06em] sm:mb-5 sm:text-4xl">
           What to wear
         </p>
         <DressCodePanel
           label="Ladies"
-          imageSrc="/ladies.jpeg"
+          imageSrc="/images/dress-code/ladies.jpeg"
           imageAlt="Ladies dress code inspiration"
           portraitImage={true}
+          revealProgress={panelReveal}
+          colorDotsProgress={dotsReveal}
         />
       </div>
     </div>
   );
 }
 
-function SceneSevenDressCodeGents() {
+function SceneSevenDressCodeGents({ holdProgress }: { holdProgress: number }) {
+  const panelReveal = Math.min(Math.max((holdProgress - 0.06) / 0.28, 0), 1);
+  const panelTranslateX = (1 - panelReveal) * 90;
+  const dotsReveal = Math.min(Math.max((holdProgress - 0.56) / 0.32, 0), 1);
+
   return (
     <div
       className="flex h-full flex-col items-center justify-center p-4 text-white sm:p-6"
@@ -605,16 +682,24 @@ function SceneSevenDressCodeGents() {
           "0 2px 4px rgba(0,0,0,0.72), 0 0 14px rgba(0,0,0,0.5), 0 0 24px rgba(0,0,0,0.34)",
       }}
     >
-      <div className="w-full max-w-4xl">
+      <div
+        className="w-full max-w-4xl"
+        style={{
+          opacity: panelReveal,
+          transform: `translateX(${panelTranslateX}px)`,
+        }}
+      >
         <p className="mb-3 text-center font-mono text-2xl font-extrabold tracking-[0.06em] sm:mb-5 sm:text-4xl">
           What to wear
         </p>
         <DressCodePanel
           label="Gents"
-          imageSrc="/gents.jpg"
+          imageSrc="/images/dress-code/gents.jpg"
           imageAlt="Gents dress code inspiration"
           portraitImage={true}
           includeWhiteColor={false}
+          revealProgress={panelReveal}
+          colorDotsProgress={dotsReveal}
         />
       </div>
     </div>
@@ -691,8 +776,11 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
   const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "error">("idle");
   const [lookupMessage, setLookupMessage] = useState("");
   const [submitStatus, setSubmitStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
+  const rsvpClosed = isRsvpClosed();
 
   const normalizedSlug = initialSlug?.trim();
+  const showDeadlineInInviteText = Boolean(normalizedSlug && !rsvpClosed);
 
   const applyInviteePayload = (payload: InviteeLookupResponse) => {
     setInvitee(payload.invitee);
@@ -746,6 +834,7 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
 
   const handleFamilyLookup = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (rsvpClosed) return;
     const trimmed = familyName.trim();
     if (!trimmed) return;
 
@@ -764,6 +853,12 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
 
   const submitRsvp = async (nextResponses: Record<string, boolean>) => {
     if (!invitee) return;
+    if (rsvpClosed) {
+      setSubmitStatus("error");
+      setSubmitMessage(RSVP_CLOSED_MESSAGE);
+      return;
+    }
+    setSubmitMessage("");
     setSubmitStatus("submitting");
     try {
       const res = await fetch("/api/rsvp", {
@@ -777,10 +872,15 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
           })),
         }),
       });
-      if (!res.ok) throw new Error("Failed to submit RSVP");
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(errData?.error ?? "Failed to submit RSVP");
+      }
       setSubmitStatus("success");
-    } catch {
+      setSubmitMessage("");
+    } catch (err) {
       setSubmitStatus("error");
+      setSubmitMessage(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     }
   };
 
@@ -798,8 +898,16 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
       <h2 className="text-center font-mono text-6xl font-extrabold tracking-[0.08em] sm:text-8xl md:text-9xl">
         RSVP
       </h2>
+      {rsvpClosed && (
+        <p className="mt-3 text-center font-mono text-base text-white/90 sm:text-lg">{RSVP_CLOSED_MESSAGE}</p>
+      )}
+      {!rsvpClosed && normalizedSlug && !invitee && (
+        <p className="mt-3 text-center font-mono text-sm text-white/90 sm:text-base">
+          Kindly submit your reply by {RSVP_DEADLINE_LABEL}.
+        </p>
+      )}
 
-      {!invitee && (
+      {!invitee && !rsvpClosed && (
         <form
           onSubmit={handleFamilyLookup}
           className="mt-8 w-full max-w-xl rounded-lg border border-white/35 bg-black/35 p-4 sm:p-6"
@@ -830,11 +938,16 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
         </form>
       )}
 
-      {invitee && isFamily && (
-        <div className="mt-7 w-full max-w-2xl rounded-lg border border-white/35 bg-black/35 p-4 sm:p-6">
-          <p className="mb-4 text-center font-mono text-base text-white/95 sm:text-xl">
+      {invitee && isFamily && !rsvpClosed && (
+        <div className="rsvp-scroll-panel mt-7 max-h-[68vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-white/35 bg-black/35 p-4 sm:max-h-[64vh] sm:p-6">
+          <p className="mb-4 text-center font-mono text-sm leading-relaxed text-white/95 sm:text-lg">
             We&apos;re so happy to celebrate with {invitee.displayName}. We truly hope you can join us, and
             please let us know who will be attending:
+            {showDeadlineInInviteText && (
+              <span className="mt-2 block text-sm font-semibold text-white/90 sm:text-base">
+                Kindly submit your reply by {RSVP_DEADLINE_LABEL}.
+              </span>
+            )}
           </p>
           <ul className="space-y-3">
             {guests.map((guest) => (
@@ -852,40 +965,47 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
               </li>
             ))}
           </ul>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={submitStatus === "submitting"}
-              className="font-mono"
-              onClick={() => {
-                const next: Record<string, boolean> = {};
-                for (const guest of guests) {
-                  next[guest.id] = false;
-                }
-                setResponses(next);
-                void submitRsvp(next);
-              }}
-            >
-              We&apos;re not attending
-            </Button>
-            <Button
-              type="button"
-              onClick={() => submitRsvp(responses)}
-              disabled={submitStatus === "submitting"}
-              className="font-mono"
-            >
-              {submitStatus === "submitting" ? "Submitting..." : "Submit RSVP"}
-            </Button>
+          <div className="sticky bottom-0 mt-5 rounded-md border border-white/20 bg-black/70 p-2 shadow-[0_-8px_20px_rgba(0,0,0,0.35)] backdrop-blur-[2px]">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={submitStatus === "submitting"}
+                className="font-mono"
+                onClick={() => {
+                  const next: Record<string, boolean> = {};
+                  for (const guest of guests) {
+                    next[guest.id] = false;
+                  }
+                  setResponses(next);
+                  void submitRsvp(next);
+                }}
+              >
+                We&apos;re not attending
+              </Button>
+              <Button
+                type="button"
+                onClick={() => submitRsvp(responses)}
+                disabled={submitStatus === "submitting"}
+                className="font-mono"
+              >
+                {submitStatus === "submitting" ? "Submitting..." : "Submit RSVP"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
 
-      {invitee && !isFamily && (
+      {invitee && !isFamily && !rsvpClosed && (
         <div className="mt-7 w-full max-w-2xl rounded-lg border border-white/35 bg-black/35 p-4 text-center sm:p-6">
-          <p className="mb-5 font-mono text-base text-white/95 sm:text-xl">
+          <p className="mb-5 font-mono text-sm leading-relaxed text-white/95 sm:text-lg">
             We&apos;re so happy to invite {individualGuest?.name ?? invitee.displayName} to celebrate this day
             with us, and we sincerely hope you&apos;re able to come.
+            {showDeadlineInInviteText && (
+              <span className="mt-2 block text-sm font-semibold text-white/90 sm:text-base">
+                Kindly submit your reply by {RSVP_DEADLINE_LABEL}.
+              </span>
+            )}
           </p>
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button
@@ -917,11 +1037,13 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
         </div>
       )}
 
-      {submitStatus === "success" && (
+      {!rsvpClosed && submitStatus === "success" && (
         <p className="mt-4 font-mono text-sm text-white/90">Thank you! Your response has been saved.</p>
       )}
-      {submitStatus === "error" && (
-        <p className="mt-4 font-mono text-sm text-red-300">Something went wrong. Please try again.</p>
+      {!rsvpClosed && submitStatus === "error" && (
+        <p className="mt-4 text-center font-mono text-sm text-red-300">
+          {submitMessage || "Something went wrong. Please try again."}
+        </p>
       )}
     </div>
   );
@@ -930,12 +1052,14 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
 const SCENES_BASE: CinematicStripScene[] = [
   {
     id: "scene-1",
-    videoSrc: "/intro_vid.mp4",
+    videoSrc: "/videos/intro_vid.mp4",
+    poster: "/images/posters/intro_vid.jpg",
     content: <SceneOneTypewriter />,
   },
   {
     id: "story",
-    videoSrc: "/walk_vid.mp4",
+    videoSrc: "/videos/beach_vid.mp4",
+    poster: "/images/posters/beach_vid.jpg",
     holdVh: STORY_CAROUSEL_HOLD_VH,
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneTwoPhotoCarousel holdProgress={holdProgress} />
@@ -943,13 +1067,15 @@ const SCENES_BASE: CinematicStripScene[] = [
   },
   {
     id: "date",
-    videoSrc: "/walk_vid.mp4",
+    videoSrc: "/videos/walk_vid.mp4",
+    poster: "/images/posters/walk_vid.jpg",
     holdVh: 100,
     content: ({ holdProgress }: CinematicSceneRenderState) => <SceneTwoCountdown holdProgress={holdProgress} />,
   },
   {
     id: "church",
-    videoSrc: "/dagat_vid.mp4",
+    videoSrc: "/videos/dagat_vid.mp4",
+    poster: "/images/posters/dagat_vid.jpg",
     contentClassName: "pointer-events-auto",
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneThreeVenue holdProgress={holdProgress} />
@@ -957,7 +1083,8 @@ const SCENES_BASE: CinematicStripScene[] = [
   },
   {
     id: "reception",
-    videoSrc: "/chest_vid.mp4",
+    videoSrc: "/videos/chest_vid.mp4",
+    poster: "/images/posters/chest_vid.jpg",
     contentClassName: "pointer-events-auto",
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneFourVenue holdProgress={holdProgress} />
@@ -965,24 +1092,32 @@ const SCENES_BASE: CinematicStripScene[] = [
   },
   {
     id: "program",
-    videoSrc: "/intro_vid.mp4",
+    videoSrc: "/videos/footprints_vid.MP4",
+    poster: "/images/posters/footprints_vid.jpg",
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneFiveProgram holdProgress={holdProgress} />
     ),
   },
   {
     id: "ladies",
-    videoSrc: "/walk_vid.mp4",
-    content: <SceneSixDressCodeLadies />,
+    videoSrc: "/videos/tapyas_vid.mp4",
+    poster: "/images/posters/tapyas_vid.jpg",
+    content: ({ holdProgress }: CinematicSceneRenderState) => (
+      <SceneSixDressCodeLadies holdProgress={holdProgress} />
+    ),
   },
   {
     id: "gents",
-    videoSrc: "/lights_vid.mp4",
-    content: <SceneSevenDressCodeGents />,
+    videoSrc: "/videos/lights_vid.mp4",
+    poster: "/images/posters/lights_vid.jpg",
+    content: ({ holdProgress }: CinematicSceneRenderState) => (
+      <SceneSevenDressCodeGents holdProgress={holdProgress} />
+    ),
   },
   {
     id: "wishlist",
-    videoSrc: "/photobooth_vid.mp4",
+    videoSrc: "/videos/photobooth_vid.mp4",
+    poster: "/images/posters/photobooth_vid.jpg",
     contentClassName: "pointer-events-auto",
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneEightWishlist holdProgress={holdProgress} />
@@ -1053,7 +1188,8 @@ export function WeddingPage({ initialSlug }: WeddingPageProps) {
       ...SCENES_BASE,
       {
         id: "rsvp",
-        videoSrc: "/chest_vid.mp4",
+        videoSrc: "/videos/bus_vid.mp4",
+        poster: "/images/posters/bus_vid.jpg",
         holdVh: 120,
         contentClassName: "pointer-events-auto",
         content: <SceneNineRsvp initialSlug={initialSlug} />,

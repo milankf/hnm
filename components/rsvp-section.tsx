@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Invitee, Guest } from "@/db/schema";
+import { RSVP_CLOSED_MESSAGE, RSVP_DEADLINE_LABEL, isRsvpClosed } from "@/lib/rsvp-deadline";
 
 type RsvpSectionProps = {
   invitee: Invitee;
@@ -19,8 +20,13 @@ export function RsvpSection({ invitee, guests }: RsvpSectionProps) {
     return initial;
   });
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const rsvpClosed = isRsvpClosed();
 
   const submitRsvp = async (attendingByGuestId: Record<string, boolean>) => {
+    if (rsvpClosed) {
+      setStatus("error");
+      return;
+    }
     setStatus("submitting");
     try {
       const res = await fetch("/api/rsvp", {
@@ -50,11 +56,20 @@ export function RsvpSection({ invitee, guests }: RsvpSectionProps) {
       <h2 className="text-center font-mono text-6xl font-medium text-foreground sm:text-8xl md:text-9xl">
         RSVP
       </h2>
+      {rsvpClosed ? (
+        <p className="text-center font-mono text-base text-muted-foreground sm:text-lg">
+          {RSVP_CLOSED_MESSAGE}
+        </p>
+      ) : (
+        <p className="text-center font-mono text-base text-muted-foreground sm:text-lg">
+          Kindly submit your reply by {RSVP_DEADLINE_LABEL}.
+        </p>
+      )}
       <p className="text-center font-mono text-lg text-muted-foreground sm:text-xl">
         {invitee.displayName}
       </p>
 
-      {isFamily ? (
+      {!rsvpClosed && isFamily && (
         <ul className="flex flex-col gap-4">
           {guests.map((g) => (
             <li key={g.id} className="flex items-center gap-3">
@@ -74,7 +89,8 @@ export function RsvpSection({ invitee, guests }: RsvpSectionProps) {
             </li>
           ))}
         </ul>
-      ) : (
+      )}
+      {!rsvpClosed && !isFamily && (
         <div className="flex flex-col gap-4">
           <div className="flex gap-4 justify-center">
             <Button
@@ -113,7 +129,7 @@ export function RsvpSection({ invitee, guests }: RsvpSectionProps) {
         </div>
       )}
 
-      {isFamily && (
+      {!rsvpClosed && isFamily && (
         <Button
           size="lg"
           className="font-mono text-base sm:text-lg"
@@ -125,10 +141,10 @@ export function RsvpSection({ invitee, guests }: RsvpSectionProps) {
         </Button>
       )}
 
-      {status === "success" && (
+      {!rsvpClosed && status === "success" && (
         <p className="font-mono text-muted-foreground">Thank you! Your response has been saved.</p>
       )}
-      {status === "error" && (
+      {!rsvpClosed && status === "error" && (
         <p className="font-mono text-destructive">Something went wrong. Please try again.</p>
       )}
     </section>

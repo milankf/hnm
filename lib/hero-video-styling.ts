@@ -1,6 +1,6 @@
 /** Hero video styling — tweak values here or use ?debug=hero for live sliders */
 
-export const HERO_VIDEO_SRC = "/intro_vid.mp4";
+export const HERO_VIDEO_SRC = "/videos/intro_vid.mp4";
 
 /** Grain opacity (0–1). Slightly higher for dust/speckle like aged film. */
 export const HERO_GRAIN_OPACITY = 0.12;

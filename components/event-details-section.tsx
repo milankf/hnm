@@ -8,7 +8,7 @@ const REDEMPTORIST_MAP =
 const BEVERLY_MAP =
   "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3925.0379983293246!2d123.88599001122567!3d10.338844267068673!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x33a9992a4c5852ad%3A0x604242490d8f54ec!2sBeverly%20View%20Events%20Pavilion!5e0!3m2!1sen!2sph!4v1773590373227!5m2!1sen!2sph";
 
-const PHOTOS = ["/redemptorist.jpg", "/beverly.jpg"];
+const PHOTOS = ["/images/venues/redemptorist.jpg", "/images/venues/beverly.jpg"];
 
 export default function EventDetailsSection() {
   const sectionRef = useRef<HTMLElement>(null);
