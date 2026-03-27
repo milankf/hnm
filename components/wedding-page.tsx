@@ -274,17 +274,7 @@ function SceneTwoCountdown({ holdProgress }: { holdProgress: number }) {
   ];
   const dateText = "AUGUST 20, 2026 (THU)";
   const timeText = "3:00 PM";
-  const unitDuration = 0.12;
-  const unitGap = 0.025;
-  const sequenceStart = 0.04;
-  const dateTypeStart = sequenceStart;
-  const dateTypeDuration = 0.17;
-  const dateTypeProgress = Math.max(0, Math.min(1, (holdProgress - dateTypeStart) / dateTypeDuration));
-  const dateVisibleLength = Math.min(dateText.length, Math.floor(dateTypeProgress * (dateText.length + 1)));
-  const timeTypeStart = sequenceStart;
-  const timeTypeDuration = 0.15;
-  const timeTypeProgress = Math.max(0, Math.min(1, (holdProgress - timeTypeStart) / timeTypeDuration));
-  const timeVisibleLength = Math.min(timeText.length, Math.floor(timeTypeProgress * (timeText.length + 1)));
+  void holdProgress;
 
   return (
     <div className="flex h-full items-center justify-center p-6 text-center">
@@ -296,23 +286,11 @@ function SceneTwoCountdown({ holdProgress }: { holdProgress: number }) {
         }}
       >
         <div className="grid grid-cols-4 gap-1.5 sm:gap-4">
-          {units.map((unit, index) => {
-            const unitStart = sequenceStart + index * (unitDuration + unitGap);
-            const unitEnd = unitStart + unitDuration;
-            const revealProgress = Math.max(0, Math.min(1, (holdProgress - unitStart) / (unitEnd - unitStart)));
-            const flipAngle = (1 - revealProgress) * 86;
-
+          {units.map((unit) => {
             return (
               <div
                 key={unit.label}
                 className="min-w-0 rounded-md border border-white/30 bg-black/25 px-1.5 py-2.5 sm:px-3 sm:py-4"
-                style={{
-                  transform: `perspective(900px) rotateY(${flipAngle}deg)`,
-                  transformOrigin: "50% 50%",
-                  opacity: revealProgress,
-                  transition:
-                    "transform 360ms cubic-bezier(0.2, 0.76, 0.24, 1), opacity 220ms cubic-bezier(0.2, 0.76, 0.24, 1)",
-                }}
               >
                 <p className="truncate font-mono text-[clamp(1.15rem,6.2vw,1.9rem)] font-bold leading-none tabular-nums sm:text-5xl">
                   {unit.value}
@@ -325,10 +303,10 @@ function SceneTwoCountdown({ holdProgress }: { holdProgress: number }) {
           })}
         </div>
         <p className="mt-6 text-xl font-bold uppercase tracking-[0.2em] text-white sm:text-3xl">
-          {dateText.slice(0, dateVisibleLength)}
+          {dateText}
         </p>
         <p className="mt-3 text-lg font-medium tracking-[0.18em] text-white/95 sm:text-2xl">
-          {timeText.slice(0, timeVisibleLength)}
+          {timeText}
         </p>
       </div>
     </div>
@@ -430,11 +408,7 @@ function SceneFourVenue({ holdProgress }: { holdProgress: number }) {
 }
 
 function SceneFiveProgram({ holdProgress }: { holdProgress: number }) {
-  const total = PROGRAM_ITEMS.length;
-  const revealWindow = 1 / (total + 0.6);
-  const programRevealEnd = total * revealWindow;
-  const noteStart = Math.min(programRevealEnd + 0.01, 0.9);
-  const noteProgress = Math.min(Math.max((holdProgress - noteStart) / 0.08, 0), 1);
+  void holdProgress;
 
   return (
     <div
@@ -450,22 +424,9 @@ function SceneFiveProgram({ holdProgress }: { holdProgress: number }) {
             What&apos;s the plan?
           </p>
           <div className="space-y-1.5 sm:space-y-2">
-            {PROGRAM_ITEMS.map((item, index) => {
-              const fromLeft = index % 2 === 0;
-              const start = index * revealWindow;
-              const progress = Math.min(Math.max((holdProgress - start) / revealWindow, 0), 1);
-              const startX = fromLeft ? -120 : 120;
-              const translateX = startX * (1 - progress);
-
+            {PROGRAM_ITEMS.map((item) => {
               return (
-                <div
-                  key={`${item.time}-${item.title}`}
-                  className="font-mono text-center"
-                  style={{
-                    transform: `translateX(${translateX}px)`,
-                    opacity: progress,
-                  }}
-                >
+                <div key={`${item.time}-${item.title}`} className="font-mono text-center">
                   <p className="text-base font-medium sm:text-2xl">
                     <span className="font-bold tracking-[0.08em]">{item.time}</span>
                     <span className="mx-2 text-white/70">-</span>
@@ -475,13 +436,7 @@ function SceneFiveProgram({ holdProgress }: { holdProgress: number }) {
               );
             })}
           </div>
-          <p
-            className="mx-auto mt-5 max-w-3xl text-center font-mono text-[11px] leading-relaxed text-white/85 sm:mt-6 sm:text-sm"
-            style={{
-              opacity: noteProgress,
-              transform: `translateY(${(1 - noteProgress) * 10}px)`,
-            }}
-          >
+          <p className="mx-auto mt-5 max-w-3xl text-center font-mono text-[11px] leading-relaxed text-white/85 sm:mt-6 sm:text-sm">
             We have chosen to hold an intimate wedding so that we may celebrate this meaningful
             milestone with the people who matter most to us.
           </p>
@@ -1069,7 +1024,7 @@ const SCENES_BASE: CinematicStripScene[] = [
     id: "date",
     videoSrc: "/videos/walk_vid.mp4",
     poster: "/images/posters/walk_vid.jpg",
-    holdVh: 100,
+    holdVh: 12.5,
     content: ({ holdProgress }: CinematicSceneRenderState) => <SceneTwoCountdown holdProgress={holdProgress} />,
   },
   {
@@ -1092,8 +1047,9 @@ const SCENES_BASE: CinematicStripScene[] = [
   },
   {
     id: "program",
-    videoSrc: "/videos/footprints_vid.MP4",
+    videoSrc: "/videos/footprints_vid.mp4",
     poster: "/images/posters/footprints_vid.jpg",
+    holdVh: 12.5,
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneFiveProgram holdProgress={holdProgress} />
     ),
@@ -1190,7 +1146,7 @@ export function WeddingPage({ initialSlug }: WeddingPageProps) {
         id: "rsvp",
         videoSrc: "/videos/bus_vid.mp4",
         poster: "/images/posters/bus_vid.jpg",
-        holdVh: 120,
+        holdVh: 0,
         contentClassName: "pointer-events-auto",
         content: <SceneNineRsvp initialSlug={initialSlug} />,
       },
