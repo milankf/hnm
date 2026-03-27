@@ -166,11 +166,16 @@ export function CinematicVideoStrip({
   const rootHeightVh = 100 + scrollTrackVh;
   const renderedScenes = scenes.length
     ? [
-        { ...scenes[0], id: `edge-top-${scenes[0].id}`, content: undefined, sceneIndex: -1 },
-        ...scenes.map((scene, sceneIndex) => ({ ...scene, sceneIndex })),
         {
           ...scenes[scenes.length - 1],
-          id: `edge-bottom-${scenes[scenes.length - 1].id}`,
+          id: `edge-top-${scenes[scenes.length - 1].id}`,
+          content: undefined,
+          sceneIndex: -1,
+        },
+        ...scenes.map((scene, sceneIndex) => ({ ...scene, sceneIndex })),
+        {
+          ...scenes[0],
+          id: `edge-bottom-${scenes[0].id}`,
           content: undefined,
           sceneIndex: -1,
         },

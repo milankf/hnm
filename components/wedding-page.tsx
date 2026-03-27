@@ -46,10 +46,10 @@ const SECTION_TWO_CAROUSEL_PHOTOS = [
   { src: "/images/carousel/carousel_penny.jpg", caption: "milestones" },
   { src: "/images/carousel/carousel_melvin.JPG" },
   { src: "/images/carousel/carousel_tavolata.webp", caption: "dates" },
-  { src: "/images/carousel/carousel_palawan.webp" },
+  { src: "/images/carousel/carousel_film.webp" },
   { src: "/images/carousel/carousel_tagaytay.webp" },
   { src: "/images/carousel/carousel_oceanpark.webp" },
-  { src: "/images/carousel/carousel_motor.webp" },
+  { src: "/images/carousel/carousel_lake.webp" },
 ];
 
 const STORY_CAROUSEL_HOLD_VH = Math.max(100, SECTION_TWO_CAROUSEL_PHOTOS.length * 14);
@@ -490,6 +490,7 @@ function DressCodeColorDots({
 
 function DressCodePanel({
   label,
+  attireText,
   imageSrc,
   imageAlt,
   portraitImage = false,
@@ -498,6 +499,7 @@ function DressCodePanel({
   colorDotsProgress = 1,
 }: {
   label: string;
+  attireText?: string;
   imageSrc: string;
   imageAlt: string;
   portraitImage?: boolean;
@@ -579,6 +581,9 @@ function DressCodePanel({
       </Dialog>
       <div className="text-left">
         <p className="font-mono text-lg font-bold text-white sm:text-2xl">{label}</p>
+        {attireText && (
+          <p className="mt-1 font-mono text-xs tracking-[0.08em] text-white/90 sm:text-sm">{attireText}</p>
+        )}
         <p className="mt-1 font-mono text-xs tracking-[0.08em] text-white/90 sm:text-sm">
           Please avoid wearing the following colors.
         </p>
@@ -613,6 +618,7 @@ function SceneSixDressCodeLadies({ holdProgress }: { holdProgress: number }) {
         </p>
         <DressCodePanel
           label="Ladies"
+          attireText="Long dress"
           imageSrc="/images/dress-code/ladies.jpeg"
           imageAlt="Ladies dress code inspiration"
           portraitImage={true}
@@ -649,6 +655,7 @@ function SceneSevenDressCodeGents({ holdProgress }: { holdProgress: number }) {
         </p>
         <DressCodePanel
           label="Gents"
+          attireText="Barong"
           imageSrc="/images/dress-code/gents.jpg"
           imageAlt="Gents dress code inspiration"
           portraitImage={true}
@@ -735,7 +742,7 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
   const rsvpClosed = isRsvpClosed();
 
   const normalizedSlug = initialSlug?.trim();
-  const showDeadlineInInviteText = Boolean(normalizedSlug && !rsvpClosed);
+  const showDeadlineInInviteText = !rsvpClosed;
 
   const applyInviteePayload = (payload: InviteeLookupResponse) => {
     setInvitee(payload.invitee);
@@ -856,7 +863,7 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
       {rsvpClosed && (
         <p className="mt-3 text-center font-mono text-base text-white/90 sm:text-lg">{RSVP_CLOSED_MESSAGE}</p>
       )}
-      {!rsvpClosed && normalizedSlug && !invitee && (
+      {!rsvpClosed && !invitee && (
         <p className="mt-3 text-center font-mono text-sm text-white/90 sm:text-base">
           Kindly submit your reply by {RSVP_DEADLINE_LABEL}.
         </p>
@@ -1056,8 +1063,9 @@ const SCENES_BASE: CinematicStripScene[] = [
   },
   {
     id: "ladies",
-    videoSrc: "/videos/tapyas_vid.mp4",
-    poster: "/images/posters/tapyas_vid.jpg",
+    videoSrc: "/videos/palawan_vid.mp4",
+    poster: "/images/posters/palawan_vid.jpg",
+    videoClassName: "object-bottom",
     content: ({ holdProgress }: CinematicSceneRenderState) => (
       <SceneSixDressCodeLadies holdProgress={holdProgress} />
     ),
