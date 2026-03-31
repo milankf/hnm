@@ -24,6 +24,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -146,6 +149,9 @@ export function AdminClient({ invitees }: AdminClientProps) {
   const [bulkIndividualsStatus, setBulkIndividualsStatus] = useState<BulkStatus>("idle");
   const [bulkIndividualsStatusMessage, setBulkIndividualsStatusMessage] = useState("");
   const [copiedInviteeId, setCopiedInviteeId] = useState<string | null>(null);
+  const [listActionNotice, setListActionNotice] = useState<{ type: "success" | "error"; message: string } | null>(
+    null
+  );
 
   const [editOpen, setEditOpen] = useState(false);
   const [editInviteeId, setEditInviteeId] = useState<string | null>(null);
@@ -430,6 +436,51 @@ export function AdminClient({ invitees }: AdminClientProps) {
     }
   };
 
+  const showListActionNotice = (type: "success" | "error", message: string) => {
+    setListActionNotice({ type, message });
+    window.setTimeout(() => {
+      setListActionNotice((current) => (current?.message === message ? null : current));
+    }, 1800);
+  };
+
+  const resetMembersToPending = async ({
+    inviteeId,
+    guestIds,
+    resetAllMembers = false,
+  }: {
+    inviteeId: string;
+    guestIds?: string[];
+    resetAllMembers?: boolean;
+  }) => {
+    try {
+      const res = await fetch("/api/admin/invitees", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          action: "resetPending",
+          inviteeId,
+          guestIds,
+          resetAllMembers,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error ?? "Failed to reset to pending");
+      }
+      const payload = data as { invitee: Invitee; guests: Guest[] };
+      setInviteesList((prev) =>
+        prev.map((inv) =>
+          inv.id === payload.invitee.id
+            ? { ...inv, ...payload.invitee, guests: payload.guests }
+            : inv
+        )
+      );
+      showListActionNotice("success", "RSVP reset to pending.");
+    } catch (err) {
+      showListActionNotice("error", err instanceof Error ? err.message : "Failed to reset RSVP.");
+    }
+  };
+
   const openEditModal = (inv: InviteeWithGuests) => {
     setEditInviteeId(inv.id);
     setEditType(inv.type);
@@ -613,6 +664,14 @@ export function AdminClient({ invitees }: AdminClientProps) {
             <p className="text-base font-semibold leading-none text-red-600">{notComingCount}</p>
           </div>
         </div>
+        {listActionNotice && (
+          <Alert
+            className="mb-3 py-2"
+            variant={listActionNotice.type === "error" ? "destructive" : "default"}
+          >
+            <AlertDescription>{listActionNotice.message}</AlertDescription>
+          </Alert>
+        )}
 
         {inviteesList.length === 0 ? (
           <Card className="col-span-full">
@@ -649,6 +708,34 @@ export function AdminClient({ invitees }: AdminClientProps) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => openEditModal(inv)}>Edit family</DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                void resetMembersToPending({
+                                  inviteeId: inv.id,
+                                  resetAllMembers: true,
+                                })
+                              }
+                            >
+                              Reset family to pending
+                            </DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>Reset member to pending</DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                {inv.guests.map((guest) => (
+                                  <DropdownMenuItem
+                                    key={guest.id}
+                                    onClick={() =>
+                                      void resetMembersToPending({
+                                        inviteeId: inv.id,
+                                        guestIds: [guest.id],
+                                      })
+                                    }
+                                  >
+                                    {guest.name}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onClick={() => openDeleteModal(inv)}
@@ -713,6 +800,16 @@ export function AdminClient({ invitees }: AdminClientProps) {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={() => openEditModal(inv)}>
                                     Edit individual
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() =>
+                                      void resetMembersToPending({
+                                        inviteeId: inv.id,
+                                        resetAllMembers: true,
+                                      })
+                                    }
+                                  >
+                                    Reset to pending
                                   </DropdownMenuItem>
                                   <DropdownMenuSeparator />
                                   <DropdownMenuItem

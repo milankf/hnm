@@ -16,12 +16,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { inviteeId, responses } = body as {
       inviteeId: string;
-      responses: { guestId: string; attending: boolean }[];
+      responses: { guestId: string; attending: boolean | null }[];
     };
 
     if (!inviteeId || !Array.isArray(responses)) {
       return NextResponse.json(
         { error: "Missing inviteeId or responses" },
+        { status: 400 }
+      );
+    }
+
+    const hasInvalidResponse = responses.some(
+      (response) =>
+        !response?.guestId ||
+        !(
+          typeof response.attending === "boolean" ||
+          response.attending === null
+        )
+    );
+
+    if (hasInvalidResponse) {
+      return NextResponse.json(
+        { error: "Invalid responses payload" },
         { status: 400 }
       );
     }
@@ -33,7 +49,7 @@ export async function POST(request: NextRequest) {
         .update(guests)
         .set({
           attending,
-          respondedAt: now,
+          respondedAt: attending === null ? null : now,
           updatedAt: now,
         })
         .where(

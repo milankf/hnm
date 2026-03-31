@@ -5,13 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { XIcon } from "lucide-react";
+import { motion } from "motion/react";
 import {
   CinematicVideoStrip,
   type CinematicSceneRenderState,
   type CinematicStripScene,
 } from "@/components/cinematic-video-strip";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Guest, Invitee } from "@/db/schema";
@@ -728,12 +728,15 @@ type InviteeLookupResponse = {
   invitee: Invitee;
   guests: Guest[];
 };
+type GuestResponseMap = Record<string, boolean | null>;
+type GuestRespondedMap = Record<string, boolean>;
 
 function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
   const router = useRouter();
   const [invitee, setInvitee] = useState<Invitee | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
-  const [responses, setResponses] = useState<Record<string, boolean>>({});
+  const [responses, setResponses] = useState<GuestResponseMap>({});
+  const [respondedByGuestId, setRespondedByGuestId] = useState<GuestRespondedMap>({});
   const [familyName, setFamilyName] = useState("");
   const [lookupStatus, setLookupStatus] = useState<"idle" | "loading" | "error">("idle");
   const [lookupMessage, setLookupMessage] = useState("");
@@ -747,11 +750,14 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
   const applyInviteePayload = (payload: InviteeLookupResponse) => {
     setInvitee(payload.invitee);
     setGuests(payload.guests);
-    const nextResponses: Record<string, boolean> = {};
+    const nextResponses: GuestResponseMap = {};
+    const nextResponded: GuestRespondedMap = {};
     for (const guest of payload.guests) {
-      nextResponses[guest.id] = guest.attending ?? false;
+      nextResponses[guest.id] = guest.attending ?? null;
+      nextResponded[guest.id] = Boolean(guest.respondedAt);
     }
     setResponses(nextResponses);
+    setRespondedByGuestId(nextResponded);
     setLookupStatus("idle");
     setLookupMessage("");
   };
@@ -813,11 +819,23 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
     }
   };
 
-  const submitRsvp = async (nextResponses: Record<string, boolean>) => {
+  const submitRsvp = async (
+    nextResponses: GuestResponseMap,
+    options?: { allowNoCheckedMembers?: boolean }
+  ) => {
     if (!invitee) return;
     if (rsvpClosed) {
       setSubmitStatus("error");
       setSubmitMessage(RSVP_CLOSED_MESSAGE);
+      return;
+    }
+    if (
+      invitee.type === "family" &&
+      !options?.allowNoCheckedMembers &&
+      !guests.some((guest) => nextResponses[guest.id] === true)
+    ) {
+      setSubmitStatus("error");
+      setSubmitMessage("Please check at least one family member before submitting RSVP.");
       return;
     }
     setSubmitMessage("");
@@ -830,7 +848,7 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
           inviteeId: invitee.id,
           responses: guests.map((guest) => ({
             guestId: guest.id,
-            attending: nextResponses[guest.id] ?? false,
+            attending: nextResponses[guest.id] ?? null,
           })),
         }),
       });
@@ -838,6 +856,11 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
         const errData = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(errData?.error ?? "Failed to submit RSVP");
       }
+      const nextResponded: GuestRespondedMap = {};
+      for (const guest of guests) {
+        nextResponded[guest.id] = nextResponses[guest.id] !== null;
+      }
+      setRespondedByGuestId(nextResponded);
       setSubmitStatus("success");
       setSubmitMessage("");
     } catch (err) {
@@ -911,45 +934,81 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
               </span>
             )}
           </p>
+          {guests.some((guest) => respondedByGuestId[guest.id]) && (
+            <p className="mb-3 text-center font-mono text-xs text-white/85 sm:text-sm">
+              Members marked as responded can still update their answer before {RSVP_DEADLINE_LABEL}.
+            </p>
+          )}
           <ul className="space-y-3">
-            {guests.map((guest) => (
-              <li key={guest.id} className="flex items-center gap-3">
-                <Checkbox
-                  id={`guest-${guest.id}`}
-                  checked={responses[guest.id] ?? false}
-                  onCheckedChange={(checked: boolean) =>
-                    setResponses((prev) => ({ ...prev, [guest.id]: checked }))
-                  }
-                />
-                <label htmlFor={`guest-${guest.id}`} className="cursor-pointer font-mono text-white sm:text-lg">
-                  {guest.name}
-                </label>
-              </li>
-            ))}
+            {guests.map((guest) => {
+              const memberResponse = responses[guest.id] ?? null;
+
+              return (
+                <li key={guest.id} className="flex items-center gap-3">
+                  <div className="flex w-full items-center gap-2">
+                    <span className="font-mono text-white sm:text-lg">{guest.name}</span>
+                    <div className="relative ml-auto grid h-8 w-28 grid-cols-2 overflow-hidden rounded-md border border-white/30">
+                      <motion.span
+                        aria-hidden
+                        initial={false}
+                        className="pointer-events-none absolute inset-y-0 w-1/2"
+                        animate={{
+                          left: memberResponse === true ? "50%" : "0%",
+                          opacity: memberResponse === null ? 0 : 1,
+                          backgroundColor:
+                            memberResponse === true ? "rgba(16,185,129,0.85)" : "rgba(239,68,68,0.85)",
+                        }}
+                        transition={{ type: "spring", stiffness: 420, damping: 32, mass: 0.45 }}
+                      />
+                      <button
+                        type="button"
+                        aria-label={`${guest.name} not attending`}
+                        aria-pressed={memberResponse === false}
+                        className={`relative z-10 flex h-8 items-center justify-center px-2 font-mono text-xs uppercase tracking-[0.06em] transition-colors ${
+                          memberResponse === false
+                            ? "text-white"
+                            : "text-white/80 hover:bg-white/10"
+                        }`}
+                        onClick={() =>
+                          setResponses((prev) => ({
+                            ...prev,
+                            [guest.id]: prev[guest.id] === false ? null : false,
+                          }))
+                        }
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`${guest.name} attending`}
+                        aria-pressed={memberResponse === true}
+                        className={`relative z-10 flex h-8 items-center justify-center border-l border-white/30 px-2 font-mono text-xs uppercase tracking-[0.06em] transition-colors ${
+                          memberResponse === true
+                            ? "text-white"
+                            : "text-white/80 hover:bg-white/10"
+                        }`}
+                        onClick={() =>
+                          setResponses((prev) => ({
+                            ...prev,
+                            [guest.id]: prev[guest.id] === true ? null : true,
+                          }))
+                        }
+                      >
+                        Yes
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
           <div className="sticky bottom-0 mt-5 rounded-md border border-white/20 bg-black/70 p-2 shadow-[0_-8px_20px_rgba(0,0,0,0.35)] backdrop-blur-[2px]">
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex">
               <Button
                 type="button"
-                variant="destructive"
+                onClick={() => void submitRsvp(responses)}
                 disabled={submitStatus === "submitting"}
-                className="font-mono"
-                onClick={() => {
-                  const next: Record<string, boolean> = {};
-                  for (const guest of guests) {
-                    next[guest.id] = false;
-                  }
-                  setResponses(next);
-                  void submitRsvp(next);
-                }}
-              >
-                We&apos;re not attending
-              </Button>
-              <Button
-                type="button"
-                onClick={() => submitRsvp(responses)}
-                disabled={submitStatus === "submitting"}
-                className="font-mono"
+                className="w-full font-mono"
               >
                 {submitStatus === "submitting" ? "Submitting..." : "Submit RSVP"}
               </Button>
@@ -969,6 +1028,17 @@ function SceneNineRsvp({ initialSlug }: { initialSlug?: string }) {
               </span>
             )}
           </p>
+          {individualGuest && respondedByGuestId[individualGuest.id] && (
+            <p className="mb-4 font-mono text-xs text-white/85 sm:text-sm">
+              You already responded:{" "}
+              {responses[individualGuest.id] === true
+                ? "I'm coming"
+                : responses[individualGuest.id] === false
+                  ? "I'm not coming"
+                  : "No final response yet"}
+              . You can still update this before {RSVP_DEADLINE_LABEL}.
+            </p>
+          )}
           <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button
               type="button"

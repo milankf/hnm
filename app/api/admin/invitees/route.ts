@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { invitees, guests } from "@/db/schema";
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne } from "drizzle-orm";
 
 function getAdminPin() {
   return process.env.ADMIN_PIN ?? process.env.ADMIN_SECRET ?? "";
@@ -115,6 +115,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
+    const { action } = body as { action?: "resetPending" };
     const { inviteeId, displayName, slug, memberNames, individualSide } = body as {
       inviteeId: string;
       displayName: string;
@@ -122,6 +123,69 @@ export async function PATCH(request: NextRequest) {
       memberNames?: string[];
       individualSide?: "bride" | "groom";
     };
+
+    if (action === "resetPending") {
+      const {
+        inviteeId: resetInviteeId,
+        guestIds,
+        resetAllMembers,
+      } = body as {
+        inviteeId: string;
+        guestIds?: string[];
+        resetAllMembers?: boolean;
+      };
+
+      if (!resetInviteeId?.trim()) {
+        return NextResponse.json({ error: "Missing inviteeId" }, { status: 400 });
+      }
+
+      const inviteeRows = await db.select().from(invitees).where(eq(invitees.id, resetInviteeId)).limit(1);
+      const invitee = inviteeRows[0];
+      if (!invitee) {
+        return NextResponse.json({ error: "Invitee not found" }, { status: 404 });
+      }
+
+      const existingGuests = await db
+        .select()
+        .from(guests)
+        .where(eq(guests.inviteeId, resetInviteeId))
+        .orderBy(asc(guests.createdAt));
+
+      const validGuestIdSet = new Set(existingGuests.map((guest) => guest.id));
+      const requestedGuestIds = Array.isArray(guestIds) ? guestIds.filter(Boolean) : [];
+      const targetGuestIds = resetAllMembers
+        ? existingGuests.map((guest) => guest.id)
+        : requestedGuestIds.filter((guestId) => validGuestIdSet.has(guestId));
+
+      if (targetGuestIds.length === 0) {
+        return NextResponse.json(
+          { error: "No valid guests selected for pending reset" },
+          { status: 400 }
+        );
+      }
+
+      await db
+        .update(guests)
+        .set({
+          attending: null,
+          respondedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(guests.inviteeId, resetInviteeId),
+            inArray(guests.id, targetGuestIds)
+          )
+        );
+
+      const updatedGuests = await db
+        .select()
+        .from(guests)
+        .where(eq(guests.inviteeId, resetInviteeId))
+        .orderBy(asc(guests.createdAt));
+
+      return NextResponse.json({ invitee, guests: updatedGuests });
+    }
 
     if (!inviteeId?.trim() || !displayName?.trim() || !slug?.trim()) {
       return NextResponse.json({ error: "Missing inviteeId, displayName, or slug" }, { status: 400 });
