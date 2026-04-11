@@ -1,6 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type TouchEvent,
+  type WheelEvent,
+} from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,7 +27,11 @@ import { Input } from "@/components/ui/input";
 import type { Guest, Invitee } from "@/db/schema";
 import { RSVP_CLOSED_MESSAGE, RSVP_DEADLINE_LABEL, isRsvpClosed } from "@/lib/rsvp-deadline";
 
-const WEDDING_DATE_TARGET = new Date("2026-08-20T15:00:00+08:00");
+const ScrollGuideBumpContext = createContext<(() => void) | undefined>(undefined);
+
+const SCROLL_HINT_NUDGE_COOLDOWN_MS = 550;
+
+const WEDDING_DATE_TARGET = new Date("2026-08-20T14:30:00+08:00");
 
 type CountdownParts = {
   days: string;
@@ -27,8 +41,8 @@ type CountdownParts = {
 };
 
 const PROGRAM_ITEMS = [
-  { time: "03:00", title: "Wedding ceremony" },
-  { time: "06:30", title: "Reception" },
+  { time: "02:30", title: "Wedding ceremony" },
+  { time: "06:00", title: "Reception" },
   { time: "07:00", title: "Dinner" },
   { time: "08:00", title: "Cake slicing and speech" },
   { time: "09:00", title: "First dance and party" },
@@ -117,12 +131,59 @@ function SceneOneTypewriter() {
 }
 
 function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
+  const bumpScrollHint = useContext(ScrollGuideBumpContext);
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [maxShiftPx, setMaxShiftPx] = useState(0);
   const [smoothShiftPx, setSmoothShiftPx] = useState(0);
   const smoothShiftPxRef = useRef(0);
   const shiftAnimationRef = useRef<number | null>(null);
+  const scrollHintLastNudgeAtRef = useRef(0);
+  const touchOriginRef = useRef<{ x: number; y: number } | null>(null);
+  const touchNudgedRef = useRef(false);
+
+  const maybeBumpScrollHint = useCallback(() => {
+    if (!bumpScrollHint) return;
+    const now = Date.now();
+    if (now - scrollHintLastNudgeAtRef.current < SCROLL_HINT_NUDGE_COOLDOWN_MS) return;
+    scrollHintLastNudgeAtRef.current = now;
+    bumpScrollHint();
+  }, [bumpScrollHint]);
+
+  const onCarouselWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      const horizontalIntent =
+        (e.shiftKey && Math.abs(e.deltaY) > 1) ||
+        (Math.abs(e.deltaX) > 8 && Math.abs(e.deltaX) > Math.abs(e.deltaY));
+      if (!horizontalIntent) return;
+      maybeBumpScrollHint();
+    },
+    [maybeBumpScrollHint]
+  );
+
+  const onCarouselTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) {
+      touchOriginRef.current = null;
+      return;
+    }
+    touchOriginRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    touchNudgedRef.current = false;
+  }, []);
+
+  const onCarouselTouchMove = useCallback(
+    (e: TouchEvent<HTMLDivElement>) => {
+      if (!touchOriginRef.current || touchNudgedRef.current || e.touches.length !== 1) return;
+      const x = e.touches[0].clientX;
+      const y = e.touches[0].clientY;
+      const dx = x - touchOriginRef.current.x;
+      const dy = y - touchOriginRef.current.y;
+      if (Math.abs(dx) < 28) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.15) return;
+      touchNudgedRef.current = true;
+      maybeBumpScrollHint();
+    },
+    [maybeBumpScrollHint]
+  );
 
   useEffect(() => {
     const measure = () => {
@@ -211,6 +272,9 @@ function SceneTwoPhotoCarousel({ holdProgress }: { holdProgress: number }) {
         <div
           ref={viewportRef}
           className="w-full overflow-hidden py-1 sm:py-2"
+          onWheel={onCarouselWheel}
+          onTouchStart={onCarouselTouchStart}
+          onTouchMove={onCarouselTouchMove}
           style={{
             maskImage:
               "linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%)",
@@ -273,7 +337,7 @@ function SceneTwoCountdown({ holdProgress }: { holdProgress: number }) {
     { label: "seconds", value: countdown.seconds },
   ];
   const dateText = "AUGUST 20, 2026 (THU)";
-  const timeText = "3:00 PM";
+  const timeText = "2:30 PM";
   void holdProgress;
 
   return (
@@ -1165,6 +1229,8 @@ type WeddingPageProps = {
 
 export function WeddingPage({ initialSlug }: WeddingPageProps) {
   const backgroundAudioRef = useRef<HTMLAudioElement>(null);
+  const [scrollGuideNudgeKey, setScrollGuideNudgeKey] = useState(0);
+  const bumpScrollHint = useCallback(() => setScrollGuideNudgeKey((k) => k + 1), []);
 
   useEffect(() => {
     const audio = backgroundAudioRef.current;
@@ -1233,7 +1299,7 @@ export function WeddingPage({ initialSlug }: WeddingPageProps) {
   );
 
   return (
-    <>
+    <ScrollGuideBumpContext.Provider value={bumpScrollHint}>
       {/* <audio ref={backgroundAudioRef} src="/inmylife.mp3" autoPlay loop preload="auto" className="hidden" /> */}
       <CinematicVideoStrip
         scenes={scenes}
@@ -1245,7 +1311,12 @@ export function WeddingPage({ initialSlug }: WeddingPageProps) {
         enableScanlines={true}
         enableFlicker={true}
         enableGateWeave={true}
+        scrollGuide={{
+          visibleWhileSceneIndexLessThan: 2,
+          text: "Scroll down",
+        }}
+        scrollGuideNudgeKey={scrollGuideNudgeKey}
       />
-    </>
+    </ScrollGuideBumpContext.Provider>
   );
 }

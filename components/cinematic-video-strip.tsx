@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { motion, useMotionValue, useTransform } from "motion/react";
 import {
   HERO_BACKGROUND_COLOR,
@@ -27,6 +28,12 @@ export type CinematicSceneRenderState = {
   isActive: boolean;
 };
 
+export type CinematicScrollGuide = {
+  /** Show the guide while the active scene index is less than this (e.g. 2 = scenes 0 and 1 only). */
+  visibleWhileSceneIndexLessThan: number;
+  text: string;
+};
+
 export type CinematicVideoStripProps = {
   scenes: CinematicStripScene[];
   holdVh?: number;
@@ -43,6 +50,10 @@ export type CinematicVideoStripProps = {
   enableFlicker?: boolean;
   enableGateWeave?: boolean;
   className?: string;
+  /** Fixed hint for early scenes (e.g. prompt vertical scroll when horizontal motion is automatic). */
+  scrollGuide?: CinematicScrollGuide;
+  /** Increment (e.g. after horizontal wheel on the story carousel) to briefly emphasize the scroll guide. */
+  scrollGuideNudgeKey?: number;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -140,10 +151,20 @@ export function CinematicVideoStrip({
   enableFlicker = true,
   enableGateWeave = true,
   className = "",
+  scrollGuide,
+  scrollGuideNudgeKey = 0,
 }: CinematicVideoStripProps) {
   const rootRef = useRef<HTMLElement>(null);
   const videoRefs = useRef<Record<number, HTMLVideoElement | null>>({});
   const [traveledVhState, setTraveledVhState] = useState(0);
+  const [scrollGuideEmphasized, setScrollGuideEmphasized] = useState(false);
+
+  useEffect(() => {
+    if (!scrollGuide || scrollGuideNudgeKey === 0) return;
+    setScrollGuideEmphasized(true);
+    const id = window.setTimeout(() => setScrollGuideEmphasized(false), 1100);
+    return () => window.clearTimeout(id);
+  }, [scrollGuide, scrollGuideNudgeKey]);
 
   const stepVh = frameHeightVh + gapVh;
   const transitionVh = stepVh;
@@ -271,6 +292,38 @@ export function CinematicVideoStrip({
     return scenes.length - 1;
   }, [holdVhByScene, sceneStartVh, scenes.length, scrollTrackVh, transitionVh, traveledVhState]);
 
+  /** Fades out while scrolling past the last "early" scene (e.g. story → date). */
+  const scrollGuideOverlayOpacity = useMemo(() => {
+    if (!scrollGuide || !scenes.length) return 0;
+
+    const n = scrollGuide.visibleWhileSceneIndexLessThan;
+    if (n <= 0) return 0;
+
+    const lastIncluded = n - 1;
+    if (lastIncluded < 0 || lastIncluded >= scenes.length) return 0;
+
+    const traveledVh = clamp(traveledVhState, 0, scrollTrackVh);
+    const holdStart = sceneStartVh[lastIncluded];
+    const holdEnd = holdStart + holdVhByScene[lastIncluded];
+    const transitionEnd = holdEnd + transitionVh;
+
+    const fadeLead = Math.max(10, Math.min(42, holdVhByScene[lastIncluded] * 0.12));
+    const fadeStart = Math.max(holdStart, holdEnd - fadeLead);
+
+    if (traveledVh < fadeStart) return 1;
+    if (traveledVh >= transitionEnd) return 0;
+
+    return clamp(1 - (traveledVh - fadeStart) / (transitionEnd - fadeStart), 0, 1);
+  }, [
+    holdVhByScene,
+    sceneStartVh,
+    scenes.length,
+    scrollGuide,
+    scrollTrackVh,
+    transitionVh,
+    traveledVhState,
+  ]);
+
   const activeRenderedIndex = activeSceneIndex >= 0 ? activeSceneIndex + 1 : 0;
 
   useEffect(() => {
@@ -386,6 +439,45 @@ export function CinematicVideoStrip({
           enableFlicker={enableFlicker}
           enableGateWeave={enableGateWeave}
         />
+
+        {scrollGuide && scrollGuideOverlayOpacity > 0.008 && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-5 z-[25] flex justify-center px-4 sm:bottom-7"
+            role="note"
+            style={{
+              opacity: scrollGuideOverlayOpacity,
+              transform: `translateY(${(1 - scrollGuideOverlayOpacity) * 14}px)`,
+            }}
+          >
+            <div
+              className={`flex flex-col items-center gap-0.5 transition-transform duration-300 ease-out ${
+                scrollGuideEmphasized ? "scale-110 sm:scale-125" : "scale-100"
+              }`}
+              style={{
+                textShadow: scrollGuideEmphasized
+                  ? "0 2px 6px rgba(0,0,0,0.92), 0 0 18px rgba(255,255,255,0.35), 0 0 28px rgba(0,0,0,0.55)"
+                  : "0 2px 4px rgba(0,0,0,0.85), 0 0 12px rgba(0,0,0,0.65), 0 0 22px rgba(0,0,0,0.45)",
+              }}
+            >
+              <p
+                className={`text-center font-mono text-xs font-medium transition-colors duration-300 sm:text-sm ${
+                  scrollGuideEmphasized ? "text-white" : "text-white/90"
+                }`}
+              >
+                {scrollGuide.text}
+              </p>
+              <ChevronDown
+                className={`motion-safe:animate-bounce transition-all duration-300 ${
+                  scrollGuideEmphasized
+                    ? "size-8 text-white sm:size-9"
+                    : "size-6 text-white/90 sm:size-7"
+                }`}
+                strokeWidth={2.5}
+                aria-hidden
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <section className="pointer-events-none relative z-10" style={{ height: `${rootHeightVh}vh` }}>

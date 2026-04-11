@@ -61,7 +61,7 @@ export default function EventDetailsSection() {
             style={{ y: dateTimeY, opacity: dateTimeOpacity }}
           >
             <div>August 20, 2026</div>
-            <div>3:00 PM</div>
+            <div>2:30 PM</div>
           </motion.div>
         </motion.div>
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 
-const WEDDING_DATE = new Date("2026-08-20T15:00:00"); // 3:00 PM
+const WEDDING_DATE = new Date("2026-08-20T14:30:00+08:00"); // 2:30 PM (+08)
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");

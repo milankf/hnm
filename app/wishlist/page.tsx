@@ -11,6 +11,7 @@ const WISHLIST_CATEGORIES = [
       "Coffee maker",
       "Stand mixer",
       "Pots & pans",
+      "Air fryer",
     ],
   },
   {
@@ -19,7 +20,7 @@ const WISHLIST_CATEGORIES = [
   },
   {
     title: "Home essentials",
-    items: ["Air purifier", "Air fryer", "Handheld vacuum", "Robot vacuum", "Humidifier"],
+    items: ["Air purifier", "Handheld vacuum", "Robot vacuum", "Humidifier"],
   },
   {
     title: "Bathroom",

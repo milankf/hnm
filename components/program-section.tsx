@@ -5,8 +5,8 @@ import { useRef } from "react";
 import { useScroll, useTransform, motion } from "motion/react";
 
 const PROGRAM_ITEMS = [
-  { time: "03:00", title: "Wedding ceremony" },
-  { time: "06:30", title: "Reception" },
+  { time: "02:30", title: "Wedding ceremony" },
+  { time: "06:00", title: "Reception" },
   { time: "07:00", title: "Dinner" },
   { time: "08:00", title: "Cake slicing and speech" },
   { time: "09:00", title: "First dance and party" },
