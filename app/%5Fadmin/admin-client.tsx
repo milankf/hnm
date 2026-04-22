@@ -589,12 +589,20 @@ export function AdminClient({ invitees }: AdminClientProps) {
               Manage invitees and track RSVP status
             </p>
           </div>
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground underline-offset-4 hover:underline"
-          >
-            ← Back to site
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link
+              href="/_seating_arrangement"
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              Seating arrangement
+            </Link>
+            <Link
+              href="/"
+              className="text-sm text-muted-foreground underline-offset-4 hover:underline"
+            >
+              ← Back to site
+            </Link>
+          </div>
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
