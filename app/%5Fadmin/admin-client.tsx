@@ -591,7 +591,7 @@ export function AdminClient({ invitees }: AdminClientProps) {
           </div>
           <div className="flex flex-wrap items-center gap-4">
             <Link
-              href="/_seating_arrangement"
+              href="/admin/seating"
               className="text-sm text-muted-foreground underline-offset-4 hover:underline"
             >
               Seating arrangement
